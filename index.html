@@ -265,7 +265,7 @@ function sparkline(series){if(series.length<2)return"";var w=300,hh=150,pad=18;f
 
 /* ===================== STATE ===================== */
 var data=load();
-var S={view:"welcome",questions:[],answers:{},idx:0,results:null,bonus:false,startedAt:0,timer:null,newName:"",newStage:"reception"};
+var S={view:"welcome",questions:[],answers:{},idx:0,results:null,bonus:false,startedAt:0,timer:null,newName:"",newStage:"reception",calOffset:0};
 function P(){return data.profiles[data.activeId];}
 function ctx(){var p=P();var today=todayStr();var baseKey=resolvePhaseKey(p,today);var phase=applyDepth(PHASES[baseKey],p.depth);var stats=topicStats(p.days,today);return{p:p,today:today,baseKey:baseKey,phase:phase,mainPhase:adaptWeights(phase,stats),chPhase:PHASES[NEXT[baseKey]],stats:stats,weak:weakTopics(phase,stats)};}
 
@@ -361,10 +361,10 @@ function progressView(){var c=ctx();var p=c.p;var days=p.days;var dk=Object.keys
   if(series.length>1)html+='<div style="font-weight:800;margin:18px 0 6px">Daily accuracy</div>'+sparkline(series);
   html+='<div style="font-weight:800;margin:16px 0 8px">How each topic is going</div>';
   rows.forEach(function(r){html+='<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-weight:800;font-size:13px;margin-bottom:4px"><span>'+esc(r.label)+'</span><span style="color:var(--muted)">'+r.pct+'%</span></div><div class="cm-bar"><i style="width:'+r.pct+'%;background:'+colFor(r.pct)+'"></i></div></div>';});
-  var now=new Date(),y=now.getFullYear(),m=now.getMonth();var startW=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate();
-  html+='<div style="font-weight:800;margin:18px 0 4px">'+now.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</div><div class="cm-cal">';["M","T","W","T","F","S","S"].forEach(function(dd){html+='<div class="cm-wkd">'+dd+'</div>';});
+  var base=new Date();base.setDate(1);base.setMonth(base.getMonth()+(S.calOffset||0));var y=base.getFullYear(),m=base.getMonth();var startW=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate();var atCurrent=(S.calOffset||0)>=0;
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 4px"><button class="cm-iconbtn" data-act="calprev">‹</button><div style="font-weight:800;font-family:\'Baloo 2\';font-size:16px">'+base.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</div><button class="cm-iconbtn" data-act="calnext"'+(atCurrent?" disabled style=\"opacity:.35\"":"")+'>›</button></div><div class="cm-cal">';["M","T","W","T","F","S","S"].forEach(function(dd){html+='<div class="cm-wkd">'+dd+'</div>';});
   for(var i=0;i<startW;i++)html+='<div></div>';
-  for(var dd=1;dd<=dim;dd++){var ds=fmt(new Date(y,m,dd));var rec=days[ds];var pp=rec?Math.round(rec.score/rec.total*100):null;html+='<div class="cm-cell'+(rec?" done":"")+'" style="'+(rec?("background:"+colFor(pp)):"")+'">'+dd+'</div>';}
+  for(var dd=1;dd<=dim;dd++){var ds=fmt(new Date(y,m,dd));var rec=days[ds];var pp=(rec&&rec.total)?Math.round(rec.score/rec.total*100):(rec?100:null);html+='<div class="cm-cell'+(rec?" done":"")+'" style="'+(rec?("background:"+colFor(pp)):"")+'">'+dd+'</div>';}
   html+='</div><div class="cm-sub" style="font-weight:700;font-size:12px;margin-top:8px">Longest streak: '+best+' day'+(best===1?"":"s")+'</div>';
  }
  html+='<div style="margin-top:16px"><button class="cm-btn ghost" data-act="nav" data-view="home">🏠 Back</button></div></div>';
@@ -396,7 +396,7 @@ function render(){var app=document.getElementById("app");var showChrome=S.view!=
 
 /* ===================== EVENTS ===================== */
 function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.getAttribute("data-act");var q=S.questions[S.idx];
- if(a==="nav"){S.view=t.getAttribute("data-view");if("speechSynthesis"in window)window.speechSynthesis.cancel();render();}
+ if(a==="nav"){S.view=t.getAttribute("data-view");S.calOffset=0;if("speechSynthesis"in window)window.speechSynthesis.cancel();render();}
  else if(a==="switch")switchProfile(t.getAttribute("data-id"));
  else if(a==="start")startSession(t.getAttribute("data-bonus")==="1");
  else if(a==="review")reviewToday();
@@ -415,6 +415,8 @@ function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.ge
  else if(a==="add")addProfile();
  else if(a==="delchild")deleteProfile(t.getAttribute("data-id"));
  else if(a==="reset")resetActive();
+ else if(a==="calprev"){S.calOffset=(S.calOffset||0)-1;render();}
+ else if(a==="calnext"){if((S.calOffset||0)<0){S.calOffset=(S.calOffset||0)+1;render();}}
 }
 function onChange(e){var t=e.target;if(!t.getAttribute)return;var a=t.getAttribute("data-act");if(a==="rename"){var v=t.value.trim();P().name=v||P().name;save();render();}}
 function onInput(e){var t=e.target;if(!t.getAttribute)return;if(t.getAttribute("data-act")==="newname")S.newName=t.value;}
