@@ -84,6 +84,18 @@ background:radial-gradient(900px 500px at 110% -10%,#d6f3ee 0,transparent 55%),r
 .cm-herobg{background:radial-gradient(circle at 50% 35%,#eafaf6,#fff);border:2px solid var(--line);border-radius:22px;display:grid;place-items:center;padding:10px}
 .cm-input{width:100%;padding:12px 14px;border-radius:14px;border:2px solid var(--line);font-family:'Nunito';font-weight:800;font-size:16px}
 .cm-hr{height:2px;background:var(--line);margin:20px 0}
+.cm-roster{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px}
+.cm-rost{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:7px 8px 6px;cursor:pointer;width:74px;font-family:'Baloo 2';font-weight:800}
+.cm-rost.on{border-color:var(--primary);background:#eafaf6}
+.cm-rost.locked{opacity:.6;background:#f7f2e8;cursor:default}
+.cm-rost.add{border-style:dashed;color:var(--primary-d)}
+.cm-rostav{width:38px;height:46px;display:grid;place-items:center;background:#f3ecde;border-radius:10px;overflow:hidden;font-size:20px}
+.cm-rostname{font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px}
+.cm-collgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.cm-coll{background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cm-coll.locked{background:#f7f2e8;opacity:.7}
+.cm-collem{font-size:34px;line-height:1}
+.cm-collname{font-family:'Baloo 2';font-weight:800;font-size:12px}
 .cm-welcome{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px calc(40px + env(safe-area-inset-bottom))}
 .cm-wtitle{font-family:'Baloo 2';font-weight:800;font-size:clamp(40px,13vw,64px);line-height:1;margin:18px 0 6px;color:var(--primary-d);letter-spacing:-1px}
 .cm-wtitle span{color:var(--accent-d)}
@@ -117,12 +129,14 @@ var FAMILY_CODE="murray-7f3k9q2x-home";
 /* ============================================================ */
 /* ===================== DATA ===================== */
 var LS="maths_minutes_v3";
-var DEFAULT_HERO={suit:"blue",cape:"red",mask:"classic",emblem:"star",accessory:"none",aura:"none"};
+var DEFAULT_HERO={suit:"blue",cape:"red",mask:"classic",emblem:"star",accessory:"none",aura:"none",sidekick:"none"};
 function defaultMulti(){return{activeId:"charlie",profiles:{
  charlie:{id:"charlie",name:"Charlie",cohort:2024,level:"auto",depth:"greater",points:0,hero:Object.assign({},DEFAULT_HERO),days:{}},
  freddie:{id:"freddie",name:"Freddie",cohort:2026,level:"auto",depth:"expected",points:0,hero:Object.assign({},DEFAULT_HERO,{suit:"red",cape:"blue"}),days:{}}
 }};}
-function fixProfile(p,id){return{id:p.id||id,name:p.name||"Child",cohort:(p.cohort==null?2024:p.cohort),level:p.level||"auto",depth:p.depth||"expected",points:p.points||0,hero:Object.assign({},DEFAULT_HERO,p.hero||{}),days:p.days||{},updatedAt:p.updatedAt||0};}
+function fixHero(h){return Object.assign({},DEFAULT_HERO,h||{});}
+function fixProfile(p,id){var heroes;if(Array.isArray(p.heroes)&&p.heroes.length)heroes=p.heroes.map(fixHero);else if(p.hero)heroes=[fixHero(p.hero)];else heroes=[Object.assign({},DEFAULT_HERO)];var heroIndex=Math.min(p.heroIndex||0,heroes.length-1);if(heroIndex<0)heroIndex=0;return{id:p.id||id,name:p.name||"Child",cohort:(p.cohort==null?2024:p.cohort),level:p.level||"auto",depth:p.depth||"expected",points:p.points||0,heroes:heroes,heroIndex:heroIndex,days:p.days||{},updatedAt:p.updatedAt||0};}
+function activeHeroOf(pr){return pr.heroes[Math.min(pr.heroIndex||0,pr.heroes.length-1)]||pr.heroes[0];}
 function mergeMulti(d){if(!d||!d.profiles||!Object.keys(d.profiles).length)return defaultMulti();var profiles={};for(var id in d.profiles)profiles[id]=fixProfile(d.profiles[id],id);var activeId=(d.activeId&&profiles[d.activeId])?d.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
 function load(){try{var r=localStorage.getItem(LS);return r?mergeMulti(JSON.parse(r)):defaultMulti();}catch(e){return defaultMulti();}}
 var DB=null,FAM_REF=null,SYNC=false;
@@ -222,24 +236,36 @@ function buildQuestions(dateStr,phase,salt,count){salt=salt||"";count=count||10;
 function speakQuestion(q){if(!("speechSynthesis"in window))return;var t;if(q.say)t=q.say;else if(q.topic==="compare"){var m=q.prompt.match(/(\d+)\s*\?\s*(\d+)/);t=m?"Which sign goes between "+m[1]+" and "+m[2]+"? Less than, equals, or greater than.":q.prompt;}else if(q.topic==="compareSums")t="Which is more? "+q.choices.map(function(c){return c.replace(/\+/g," plus ");}).join(", or ");else t=q.prompt.replace(/\+/g," plus ").replace(/➕/g," plus ").replace(/[−-]/g," minus ").replace(/×/g," times ").replace(/÷/g," divided by ").replace(/=/g," equals ").replace(/\?/g," what ").replace(/</g," less than ").replace(/>/g," greater than ");var u=new SpeechSynthesisUtterance(t);u.lang="en-GB";u.rate=0.9;u.pitch=1.06;window.speechSynthesis.cancel();window.speechSynthesis.speak(u);}
 
 /* ===================== REWARDS ===================== */
-var CATS=[{key:"suit",label:"Suit colour"},{key:"cape",label:"Cape"},{key:"mask",label:"Mask & head"},{key:"emblem",label:"Chest symbol"},{key:"accessory",label:"Gadget"},{key:"aura",label:"Power aura"}];
-var OPTIONS={suit:[{id:"blue",label:"Blue",cost:0},{id:"red",label:"Red",cost:0},{id:"green",label:"Green",cost:100},{id:"purple",label:"Purple",cost:250},{id:"orange",label:"Orange",cost:450},{id:"black",label:"Shadow",cost:700},{id:"pink",label:"Pink",cost:900},{id:"gold",label:"Gold",cost:1500}],
- cape:[{id:"none",label:"None",cost:0},{id:"red",label:"Red",cost:0},{id:"blue",label:"Blue",cost:150},{id:"gold",label:"Gold",cost:600},{id:"rainbow",label:"Rainbow",cost:1200}],
- mask:[{id:"classic",label:"Eye mask",cost:0},{id:"visor",label:"Visor",cost:300},{id:"helmet",label:"Helmet",cost:800},{id:"crown",label:"Crown",cost:1800}],
- emblem:[{id:"star",label:"Star",cost:0},{id:"lightning",label:"Lightning",cost:120},{id:"shield",label:"Shield",cost:400},{id:"heart",label:"Heart",cost:550},{id:"diamond",label:"Diamond",cost:1000},{id:"sun",label:"Sun",cost:2000}],
- accessory:[{id:"none",label:"None",cost:0},{id:"shield",label:"Shield",cost:350},{id:"sword",label:"Sword",cost:650},{id:"wand",label:"Magic wand",cost:1100},{id:"jetpack",label:"Jetpack",cost:1400}],
- aura:[{id:"none",label:"None",cost:0},{id:"glow",label:"Glow",cost:500},{id:"stars",label:"Stars",cost:1600}]};
-var UNLOCKS=[];CATS.forEach(function(cat){OPTIONS[cat.key].forEach(function(o){if(o.cost>0)UNLOCKS.push({cat:cat.key,id:o.id,label:o.label,cost:o.cost});});});UNLOCKS.sort(function(a,b){return a.cost-b.cost;});
+var CATS=[{key:"suit",label:"Suit colour"},{key:"cape",label:"Cape"},{key:"mask",label:"Mask & head"},{key:"emblem",label:"Chest symbol"},{key:"accessory",label:"Gadget"},{key:"aura",label:"Power aura"},{key:"sidekick",label:"Sidekick pet"}];
+var OPTIONS={
+ suit:[{id:"blue",label:"Blue",cost:0},{id:"red",label:"Red",cost:0},{id:"green",label:"Green",cost:100},{id:"teal",label:"Teal",cost:200},{id:"purple",label:"Purple",cost:250},{id:"lime",label:"Lime",cost:350},{id:"orange",label:"Orange",cost:450},{id:"cyan",label:"Cyan",cost:550},{id:"black",label:"Shadow",cost:700},{id:"magenta",label:"Magenta",cost:800},{id:"pink",label:"Pink",cost:900},{id:"silver",label:"Silver",cost:1200},{id:"gold",label:"Gold",cost:1500},{id:"rainbow",label:"Rainbow",cost:3000}],
+ cape:[{id:"none",label:"None",cost:0},{id:"red",label:"Red",cost:0},{id:"blue",label:"Blue",cost:150},{id:"green",label:"Green",cost:250},{id:"purple",label:"Purple",cost:500},{id:"gold",label:"Gold",cost:600},{id:"black",label:"Black",cost:850},{id:"silver",label:"Silver",cost:1300},{id:"rainbow",label:"Rainbow",cost:1200}],
+ mask:[{id:"classic",label:"Eye mask",cost:0},{id:"visor",label:"Visor",cost:300},{id:"goggles",label:"Goggles",cost:400},{id:"ninja",label:"Ninja",cost:700},{id:"helmet",label:"Helmet",cost:800},{id:"cyber",label:"Cyber",cost:1400},{id:"crown",label:"Crown",cost:1800}],
+ emblem:[{id:"star",label:"Star",cost:0},{id:"lightning",label:"Lightning",cost:120},{id:"flame",label:"Flame",cost:300},{id:"shield",label:"Shield",cost:400},{id:"heart",label:"Heart",cost:550},{id:"moon",label:"Moon",cost:700},{id:"paw",label:"Paw",cost:850},{id:"diamond",label:"Diamond",cost:1000},{id:"sun",label:"Sun",cost:2000}],
+ accessory:[{id:"none",label:"None",cost:0},{id:"shield",label:"Shield",cost:350},{id:"sword",label:"Sword",cost:650},{id:"bow",label:"Bow",cost:950},{id:"wand",label:"Magic wand",cost:1100},{id:"hammer",label:"Hammer",cost:1300},{id:"jetpack",label:"Jetpack",cost:1400}],
+ aura:[{id:"none",label:"None",cost:0},{id:"glow",label:"Glow",cost:500},{id:"hearts",label:"Hearts",cost:1000},{id:"fire",label:"Fire",cost:1400},{id:"stars",label:"Stars",cost:1600}],
+ sidekick:[{id:"none",label:"None",cost:0},{id:"dog",label:"Puppy",cost:200},{id:"cat",label:"Kitten",cost:300},{id:"owl",label:"Owl",cost:600},{id:"fox",label:"Fox",cost:800},{id:"dragon",label:"Dragon",cost:1100},{id:"robot",label:"Robot",cost:1300},{id:"unicorn",label:"Unicorn",cost:1700},{id:"dino",label:"Dino",cost:2100},{id:"tiger",label:"Tiger",cost:2500},{id:"eagle",label:"Eagle",cost:3000}]
+};
+var SIDEKICK={none:"",dog:"🐶",cat:"🐱",owl:"🦉",fox:"🦊",dragon:"🐉",robot:"🤖",unicorn:"🦄",dino:"🦖",tiger:"🐯",eagle:"🦅"};
+var TEAM_SLOTS=[0,800,2000,4000,7000];
+function teamSize(points){var n=0;for(var i=0;i<TEAM_SLOTS.length;i++)if(points>=TEAM_SLOTS[i])n++;return Math.max(1,n);}
+var COLLECTIBLES=[{id:"bronze",e:"🥉",label:"Bronze medal",cost:150},{id:"crystal",e:"💠",label:"Power crystal",cost:350},{id:"medal2",e:"🎖️",label:"Honour medal",cost:550},{id:"silvermed",e:"🥈",label:"Silver medal",cost:750},{id:"orb",e:"🔮",label:"Magic orb",cost:1000},{id:"goldmed",e:"🥇",label:"Gold medal",cost:1300},{id:"rocket",e:"🚀",label:"Rocket",cost:1600},{id:"starcup",e:"🌟",label:"Star badge",cost:1900},{id:"planet",e:"🪐",label:"Planet",cost:2200},{id:"trophy",e:"🏆",label:"Champion cup",cost:2600},{id:"gem",e:"💎",label:"Giant gem",cost:3000},{id:"console",e:"🎮",label:"Game console",cost:3400},{id:"crownc",e:"👑",label:"Golden crown",cost:4000},{id:"key",e:"🗝️",label:"Hero key",cost:4600},{id:"castle",e:"🏰",label:"Hero base",cost:5500},{id:"comet",e:"☄️",label:"Comet",cost:6500}];
+var UNLOCKS=[];
+CATS.forEach(function(cat){OPTIONS[cat.key].forEach(function(o){if(o.cost>0)UNLOCKS.push({kind:"part",cat:cat.key,id:o.id,label:o.label,cost:o.cost});});});
+COLLECTIBLES.forEach(function(o){if(o.cost>0)UNLOCKS.push({kind:"collectible",id:o.id,label:o.e+" "+o.label,cost:o.cost});});
+for(var ti=1;ti<TEAM_SLOTS.length;ti++)UNLOCKS.push({kind:"team",label:"a new hero slot",cost:TEAM_SLOTS[ti]});
+UNLOCKS.sort(function(a,b){return a.cost-b.cost;});
 
 /* ===================== HERO SVG ===================== */
-var SUIT={red:"#e23b3b",blue:"#2f6bd6",green:"#27a85a",purple:"#7b3fc9",orange:"#f08a24",black:"#33333f",pink:"#ec5fa6",gold:"#e7b528"};
-var DARK={red:"#b32a2a",blue:"#234f9e",green:"#1c8045",purple:"#5e2e9b",orange:"#c86c12",black:"#23232c",pink:"#c64487",gold:"#b88c12"};
-var CAPECOL={red:"#c62828",blue:"#1e4fa3",gold:"#e7b528"};
+var SUIT={red:"#e23b3b",blue:"#2f6bd6",green:"#27a85a",purple:"#7b3fc9",orange:"#f08a24",black:"#33333f",pink:"#ec5fa6",gold:"#e7b528",teal:"#14b8a6",lime:"#84cc16",cyan:"#06b6d4",magenta:"#d946ef",silver:"#9aa3b2"};
+var DARK={red:"#b32a2a",blue:"#234f9e",green:"#1c8045",purple:"#5e2e9b",orange:"#c86c12",black:"#23232c",pink:"#c64487",gold:"#b88c12",teal:"#0d8a7d",lime:"#5f9410",cyan:"#0894ad",magenta:"#a52bbd",silver:"#6f7787"};
+var CAPECOL={red:"#c62828",blue:"#1e4fa3",gold:"#e7b528",green:"#1c8045",purple:"#5e2e9b",black:"#33333f",silver:"#9aa3b2"};
 function starPts(cx,cy,r){var p="";for(var i=0;i<10;i++){var a=Math.PI/5*i-Math.PI/2;var rad=i%2?r*0.45:r;p+=(cx+rad*Math.cos(a))+","+(cy+rad*Math.sin(a))+" ";}return p.trim();}
-function emblemSVG(type){switch(type){case"star":return'<polygon points="'+starPts(100,122,14)+'" fill="#fff"/>';case"lightning":return'<polygon points="98,108 110,108 101,122 111,122 90,140 97,124 89,124" fill="#ffe14d" stroke="#caa400" stroke-width="1"/>';case"shield":return'<path d="M100 106 l13 5 v9 c0 9 -7 14 -13 17 c-6 -3 -13 -8 -13 -17 v-9 z" fill="#fff"/>';case"heart":return'<path d="M100 134 C 87 123 88 109 100 116 C 112 109 113 123 100 134 Z" fill="#ff7aa8"/>';case"diamond":return'<polygon points="100,106 114,122 100,138 86,122" fill="#8fe3ff"/>';case"sun":var g="";for(var i=0;i<8;i++){var a=Math.PI/4*i;g+='<line x1="'+(100+8*Math.cos(a))+'" y1="'+(122+8*Math.sin(a))+'" x2="'+(100+15*Math.cos(a))+'" y2="'+(122+15*Math.sin(a))+'" stroke="#ffd23f" stroke-width="3"/>';}return g+'<circle cx="100" cy="122" r="7" fill="#ffd23f"/>';default:return"";}}
-function heroSVG(hero,size){var s=SUIT[hero.suit]||SUIT.blue,d=DARK[hero.suit]||DARK.blue,skin="#f4c39c";var cape=hero.cape==="rainbow"?"url(#rg)":CAPECOL[hero.cape];var g="";
+function emblemSVG(type){switch(type){case"star":return'<polygon points="'+starPts(100,122,14)+'" fill="#fff"/>';case"lightning":return'<polygon points="98,108 110,108 101,122 111,122 90,140 97,124 89,124" fill="#ffe14d" stroke="#caa400" stroke-width="1"/>';case"shield":return'<path d="M100 106 l13 5 v9 c0 9 -7 14 -13 17 c-6 -3 -13 -8 -13 -17 v-9 z" fill="#fff"/>';case"heart":return'<path d="M100 134 C 87 123 88 109 100 116 C 112 109 113 123 100 134 Z" fill="#ff7aa8"/>';case"diamond":return'<polygon points="100,106 114,122 100,138 86,122" fill="#8fe3ff"/>';case"flame":return'<path d="M100 105 c8 9 11 15 4 23 c6 -1 8 -7 6 -13 c5 5 7 12 1 19 c-3 4 -8 6 -11 6 c-8 0 -13 -6 -13 -13 c0 -8 8 -11 8 -20 c4 2 6 6 5 10 c3 -3 4 -7 -0 -12 z" fill="#ff8a1f"/>';case"moon":return'<path d="M106 107 a15 15 0 1 0 1 30 a12 12 0 1 1 -1 -30 z" fill="#fff"/>';case"paw":return'<circle cx="100" cy="128" r="7" fill="#fff"/><circle cx="90" cy="117" r="3.4" fill="#fff"/><circle cx="100" cy="113" r="3.4" fill="#fff"/><circle cx="110" cy="117" r="3.4" fill="#fff"/>';case"sun":var g="";for(var i=0;i<8;i++){var a=Math.PI/4*i;g+='<line x1="'+(100+8*Math.cos(a))+'" y1="'+(122+8*Math.sin(a))+'" x2="'+(100+15*Math.cos(a))+'" y2="'+(122+15*Math.sin(a))+'" stroke="#ffd23f" stroke-width="3"/>';}return g+'<circle cx="100" cy="122" r="7" fill="#ffd23f"/>';default:return"";}}
+function heroSVG(hero,size){var solid=SUIT[hero.suit]||SUIT.blue,d=DARK[hero.suit]||DARK.blue,skin="#f4c39c";var s=(hero.suit==="rainbow")?"url(#rg)":solid;if(hero.suit==="rainbow")d="#5e2e9b";var cape=hero.cape==="rainbow"?"url(#rg)":CAPECOL[hero.cape];var g="";
  if(hero.aura==="glow")g+='<circle cx="100" cy="120" r="105" fill="url(#gl)"/>';
  if(hero.aura==="stars"){for(var i=0;i<7;i++){var a=Math.PI*2/7*i;g+='<polygon points="'+starPts(100+92*Math.cos(a),116+96*Math.sin(a),7)+'" fill="#ffd23f"/>';}}
+ if(hero.aura==="hearts"||hero.aura==="fire"){var em=hero.aura==="hearts"?"❤️":"🔥";for(var i=0;i<8;i++){var a=Math.PI*2/8*i;g+='<text x="'+(100+96*Math.cos(a))+'" y="'+(122+98*Math.sin(a))+'" font-size="20" text-anchor="middle" dominant-baseline="central">'+em+'</text>';}}
  if(hero.cape!=="none")g+='<path d="M74 94 L56 208 Q100 220 144 208 L126 94 Q100 102 74 94 Z" fill="'+cape+'" opacity="0.95"/>';
  if(hero.accessory==="jetpack"){[64,122].forEach(function(x){g+='<rect x="'+x+'" y="148" width="14" height="30" rx="6" fill="#6b7280"/><polygon points="'+(x+2)+',178 '+(x+12)+',178 '+(x+7)+',196" fill="#ff8a1f"/><polygon points="'+(x+4)+',178 '+(x+10)+',178 '+(x+7)+',190" fill="#ffd23f"/>';});}
  g+='<rect x="80" y="158" width="18" height="52" rx="8" fill="'+d+'"/><rect x="102" y="158" width="18" height="52" rx="8" fill="'+d+'"/><rect x="77" y="204" width="24" height="14" rx="6" fill="#1f1f27"/><rect x="99" y="204" width="24" height="14" rx="6" fill="#1f1f27"/>';
@@ -249,10 +275,16 @@ function heroSVG(hero,size){var s=SUIT[hero.suit]||SUIT.blue,d=DARK[hero.suit]||
  if(hero.mask==="classic")g+='<rect x="82" y="54" width="36" height="13" rx="6" fill="#1f2740"/><ellipse cx="93" cy="60" rx="4" ry="3" fill="#fff"/><ellipse cx="107" cy="60" rx="4" ry="3" fill="#fff"/>';
  else if(hero.mask==="visor")g+='<rect x="80" y="52" width="40" height="15" rx="7" fill="#35cdff" opacity="0.92"/><rect x="84" y="55" width="12" height="4" rx="2" fill="#fff" opacity="0.6"/>';
  else if(hero.mask==="helmet")g+='<path d="M74 64 A26 26 0 0 1 126 64 Z" fill="'+d+'"/><rect x="84" y="56" width="32" height="10" rx="5" fill="#cfe8ff"/>';
+ else if(hero.mask==="goggles")g+='<circle cx="92" cy="60" r="7" fill="#bfe9ff" stroke="#1f2740" stroke-width="3"/><circle cx="108" cy="60" r="7" fill="#bfe9ff" stroke="#1f2740" stroke-width="3"/><rect x="98" y="58" width="4" height="3" fill="#1f2740"/><rect x="74" y="58" width="6" height="3" fill="#1f2740"/><rect x="120" y="58" width="6" height="3" fill="#1f2740"/>';
+ else if(hero.mask==="ninja")g+='<rect x="74" y="52" width="52" height="16" fill="#1f2740"/><path d="M126 56 l14 -4 -8 10 z" fill="#1f2740"/><rect x="86" y="58" width="11" height="4" rx="2" fill="#fff"/><rect x="103" y="58" width="11" height="4" rx="2" fill="#fff"/>';
+ else if(hero.mask==="cyber")g+='<rect x="78" y="53" width="44" height="14" rx="4" fill="#101626"/><rect x="82" y="57" width="36" height="6" rx="3" fill="#27e6c3"/><rect x="86" y="58" width="6" height="4" fill="#0a4a40"/><rect x="108" y="58" width="6" height="4" fill="#0a4a40"/>';
  else if(hero.mask==="crown")g+='<circle cx="92" cy="60" r="3" fill="#1f2740"/><circle cx="108" cy="60" r="3" fill="#1f2740"/><polygon points="82,48 88,57 100,44 112,57 118,48 118,60 82,60" fill="#f2c200" stroke="#c89b00" stroke-width="1.5"/><circle cx="100" cy="46" r="2.5" fill="#ff5a5f"/>';
  if(hero.accessory==="shield")g+='<circle cx="56" cy="160" r="16" fill="#cfd6e0" stroke="#9aa6b6" stroke-width="3"/><path d="M56 148 v24 M44 160 h24" stroke="#e23b3b" stroke-width="3"/>';
  else if(hero.accessory==="sword")g+='<rect x="135" y="118" width="6" height="46" rx="3" fill="#d8dee8" stroke="#aab3c2"/><rect x="127" y="150" width="22" height="6" rx="3" fill="#8a6a2f"/>';
  else if(hero.accessory==="wand")g+='<rect x="136" y="128" width="4" height="36" rx="2" fill="#7b4a1e"/><polygon points="'+starPts(138,124,8)+'" fill="#ffd23f" stroke="#caa400"/>';
+ else if(hero.accessory==="bow")g+='<path d="M140 120 q-16 24 0 48" fill="none" stroke="#8a6a2f" stroke-width="3"/><line x1="140" y1="120" x2="140" y2="168" stroke="#cfd6e0" stroke-width="1.5"/>';
+ else if(hero.accessory==="hammer")g+='<rect x="138" y="120" width="4" height="44" rx="2" fill="#7b4a1e"/><rect x="128" y="116" width="24" height="16" rx="3" fill="#8a96a6" stroke="#6b7280" stroke-width="1.5"/>';
+ if(hero.sidekick&&hero.sidekick!=="none"&&SIDEKICK[hero.sidekick])g+='<text x="172" y="200" font-size="34" text-anchor="middle" dominant-baseline="central">'+SIDEKICK[hero.sidekick]+'</text>';
  return'<svg viewBox="0 0 200 240" width="'+size+'" height="'+(size*1.2)+'"><defs><radialGradient id="gl" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffe27a" stop-opacity="0.85"/><stop offset="100%" stop-color="#ffe27a" stop-opacity="0"/></radialGradient><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff4d4d"/><stop offset="33%" stop-color="#ffd23f"/><stop offset="66%" stop-color="#33c777"/><stop offset="100%" stop-color="#3b8dff"/></linearGradient></defs>'+g+'</svg>';}
 
 /* ===================== HELPERS ===================== */
@@ -282,16 +314,17 @@ function reviewToday(){var c=ctx();var rec=c.p.days[c.today];var cnt=c.phase.cou
 function switchProfile(id){if("speechSynthesis"in window)window.speechSynthesis.cancel();data.activeId=id;save();S.results=null;S.view="home";render();}
 function addProfile(){var nm=(S.newName||"").trim()||"Child";var id=(nm.toLowerCase().replace(/[^a-z0-9]/g,"")||"child")+"-"+Date.now().toString(36);data.profiles[id]={id:id,name:nm,cohort:cohortFromStage(S.newStage,todayStr()),level:"auto",depth:"expected",points:0,hero:Object.assign({},DEFAULT_HERO),days:{}};data.activeId=id;S.newName="";save();S.view="home";render();}
 function deleteProfile(id){if(Object.keys(data.profiles).length<=1)return;if(!confirm("Remove "+data.profiles[id].name+" and all their progress?"))return;delete data.profiles[id];if(data.activeId===id)data.activeId=Object.keys(data.profiles)[0];save();render();}
-function resetActive(){var p=P();if(!confirm("Clear "+p.name+"'s progress, points and hero? This cannot be undone."))return;p.points=0;p.days={};p.hero=Object.assign({},DEFAULT_HERO);save();S.view="home";render();}
+function resetActive(){var p=P();if(!confirm("Clear "+p.name+"'s progress, points and hero? This cannot be undone."))return;p.points=0;p.days={};p.heroes=[Object.assign({},DEFAULT_HERO)];p.heroIndex=0;save();S.view="home";render();}
 
 /* ===================== VIEWS ===================== */
 function topBar(){var c=ctx();return'<div class="cm-topbar"><div class="cm-logo"><span class="cm-dot">✦</span> Maths Minutes</div><div style="display:flex;gap:6px">'+
  '<span class="cm-pill">🔥 '+calcStreak(c.p.days)+'</span><span class="cm-pill">⭐ '+(c.p.points||0)+'</span>'+
  '<button class="cm-iconbtn'+(S.view==="hero"?" on":"")+'" data-act="nav" data-view="'+(S.view==="hero"?"home":"hero")+'">🦸</button>'+
+  '<button class="cm-iconbtn'+(S.view==="collection"?" on":"")+'" data-act="nav" data-view="'+(S.view==="collection"?"home":"collection")+'">🏅</button>'+
  '<button class="cm-iconbtn'+(S.view==="progress"?" on":"")+'" data-act="nav" data-view="'+(S.view==="progress"?"home":"progress")+'">📊</button>'+
  '<button class="cm-iconbtn'+(S.view==="settings"?" on":"")+'" data-act="nav" data-view="'+(S.view==="settings"?"home":"settings")+'">⚙️</button></div></div>';}
-function profileBar(){var html='<div class="cm-profiles">';for(var id in data.profiles){var pr=data.profiles[id];html+='<button class="cm-prof'+(id===data.activeId?" on":"")+'" data-act="switch" data-id="'+id+'"><span class="cm-profav">'+heroSVG(pr.hero,30)+'</span>'+esc(pr.name)+'</button>';}html+='<button class="cm-prof" data-act="nav" data-view="settings">➕ Add</button></div>';return html;}
-function welcomeView(){var hero=P()?P().hero:DEFAULT_HERO;
+function profileBar(){var html='<div class="cm-profiles">';for(var id in data.profiles){var pr=data.profiles[id];html+='<button class="cm-prof'+(id===data.activeId?" on":"")+'" data-act="switch" data-id="'+id+'"><span class="cm-profav">'+heroSVG(activeHeroOf(pr),30)+'</span>'+esc(pr.name)+'</button>';}html+='<button class="cm-prof" data-act="nav" data-view="settings">➕ Add</button></div>';return html;}
+function welcomeView(){var hero=P()?activeHeroOf(P()):DEFAULT_HERO;
  return '<div class="cm-welcome">'+
   '<div style="position:relative;width:100%;max-width:440px">'+
    '<span class="cm-wstars" style="left:8%;top:6%">⭐</span><span class="cm-wstars" style="right:10%;top:0;animation-delay:.6s">✨</span><span class="cm-wstars" style="left:14%;bottom:8%;animation-delay:1.2s">✨</span><span class="cm-wstars" style="right:8%;bottom:4%;animation-delay:.9s">⭐</span>'+
@@ -316,7 +349,7 @@ function homeView(){var c=ctx();var p=c.p;var cnt=c.phase.count||10;var chN=c.ph
   if(c.weak.length>0)html+='<div class="cm-sub" style="font-weight:700;font-size:13px;margin-top:10px">Giving '+esc(p.name)+' extra practice on: '+esc(c.weak.slice(0,3).join(", "))+'</div>';
   html+='<div style="margin-top:18px"><button class="cm-btn" data-act="start">Start today\'s maths ✏️</button></div>';
  }else{html+='<div style="display:flex;align-items:center;gap:10px;margin-top:16px"><span class="cm-confetti">🎉</span><div><div style="font-weight:800;font-size:18px">All done for today!</div><div class="cm-sub" style="font-weight:700">Scored '+p.days[c.today].score+'/'+p.days[c.today].total+'. New questions tomorrow.</div></div></div><div class="cm-nav" style="margin-top:16px"><button class="cm-btn ghost" data-act="review">See answers</button><button class="cm-btn amber" data-act="start" data-bonus="1">More questions ⭐</button></div>';}
- html+='<div class="cm-ptcard"><div style="display:flex;align-items:center;gap:12px"><div class="cm-herobg" style="width:78px;height:92px;flex:0 0 auto">'+heroSVG(p.hero,62)+'</div><div style="flex:1"><div style="font-weight:800;font-size:15px">⭐ '+points+' points</div>';
+ html+='<div class="cm-ptcard"><div style="display:flex;align-items:center;gap:12px"><div class="cm-herobg" style="width:78px;height:92px;flex:0 0 auto">'+heroSVG(activeHeroOf(p),62)+'</div><div style="flex:1"><div style="font-weight:800;font-size:15px">⭐ '+points+' points</div>';
  if(nextUnlock)html+='<div class="cm-sub" style="font-weight:700;font-size:12px;margin:4px 0">'+(nextUnlock.cost-points)+' more to unlock a new '+esc(nextUnlock.label.toLowerCase())+'!</div><div class="cm-bar"><i style="width:'+Math.round(points/nextUnlock.cost*100)+'%;background:var(--accent)"></i></div>';
  else html+='<div class="cm-sub" style="font-weight:700;font-size:12px;margin-top:4px">Everything unlocked! 🏆</div>';
  html+='</div></div><button class="cm-btn purple sm" style="width:100%;margin-top:12px" data-act="nav" data-view="hero">Build my superhero 🦸</button></div>';
@@ -343,12 +376,29 @@ function resultsView(){var c=ctx();var R=S.results;var pct=R.total?Math.round(R.
  R.res.forEach(function(r){var cls=r.challenger?(r.ok?"r":"cx"):(r.ok?"r":"w");var mk=r.ok?"var(--good)":(r.challenger?"var(--purple)":"var(--bad)");html+='<div class="cm-row '+cls+'"><span class="cm-mark" style="background:'+mk+'">'+(r.ok?"✓":"✗")+'</span><div style="flex:1"><div style="font-weight:800">'+(r.challenger?"🚀 ":"")+esc(r.prompt)+'</div><div style="font-size:13px;color:var(--muted);font-weight:700">'+esc(c.p.name)+': <b style="color:'+(r.ok?"var(--good)":"var(--bad)")+'">'+(r.given?esc(r.given):"—")+'</b>'+(!r.ok?(' · Answer: <b style="color:var(--ink)">'+esc(r.answer)+'</b>'):"")+'</div></div></div>';});
  html+='</div><div class="cm-nav" style="margin-top:14px"><button class="cm-btn ghost" data-act="nav" data-view="home">🏠 Home</button><button class="cm-btn amber" data-act="start" data-bonus="1">➕ More questions</button></div></div>';
  return html;}
-function heroView(){var c=ctx();var p=c.p;var points=p.points||0;var nextUnlock=null;for(var i=0;i<UNLOCKS.length;i++){if(UNLOCKS[i].cost>points){nextUnlock=UNLOCKS[i];break;}}
- var html='<div class="cm-card"><div style="font-family:\'Baloo 2\';font-weight:800;font-size:22px;margin-bottom:10px">'+esc(p.name)+'\'s superhero 🦸</div><div class="cm-herobg" style="min-height:230px">'+heroSVG(p.hero,180)+'</div><div style="text-align:center;margin:10px 0 4px"><span class="cm-pill">⭐ '+points+' points</span></div>';
- if(nextUnlock)html+='<div class="cm-sub" style="font-weight:700;font-size:13px;text-align:center;margin-bottom:8px">Next unlock: '+esc(nextUnlock.label)+' ('+nextUnlock.cost+' points)</div>';
- CATS.forEach(function(cat){html+='<div style="font-weight:800;margin:12px 0 2px">'+cat.label+'</div><div class="cm-optgrid">';OPTIONS[cat.key].forEach(function(o){var unlocked=points>=o.cost;var sel=p.hero[cat.key]===o.id;html+='<button class="cm-chip'+(sel?" sel":"")+(unlocked?"":" locked")+'" '+(unlocked?('data-act="part" data-cat="'+cat.key+'" data-opt="'+o.id+'"'):"")+'>'+(unlocked?"":'<span class="cm-lk">🔒</span>')+'<span>'+o.label+'</span><span class="cm-chipcost">'+(o.cost===0?"Free":unlocked?"✓":o.cost+" pts")+'</span></button>';});html+='</div>';});
- html+='<button class="cm-btn" data-act="nav" data-view="home">🏠 Back</button></div>';
- return html;}
+function heroView(){var c=ctx();var p=c.p;var points=p.points||0;var slots=teamSize(points);var ah=activeHeroOf(p);var nextUnlock=null;for(var i=0;i<UNLOCKS.length;i++){if(UNLOCKS[i].cost>points){nextUnlock=UNLOCKS[i];break;}}
+  var html='<div class="cm-card"><div style="font-family:\'Baloo 2\';font-weight:800;font-size:22px;margin-bottom:8px">'+esc(p.name)+'\'s hero team 🦸</div>';
+  html+='<div class="cm-roster">';
+  for(var i=0;i<slots;i++){if(i<p.heroes.length){html+='<button class="cm-rost'+(i===p.heroIndex?" on":"")+'" data-act="selhero" data-i="'+i+'"><span class="cm-rostav">'+heroSVG(p.heroes[i],34)+'</span><span class="cm-rostname">'+esc(p.heroes[i].hname||("Hero "+(i+1)))+'</span></button>';}else{html+='<button class="cm-rost add" data-act="addhero"><span class="cm-rostav" style="font-size:24px">➕</span><span class="cm-rostname">New hero</span></button>';break;}}
+  for(var j=slots;j<TEAM_SLOTS.length;j++){html+='<div class="cm-rost locked"><span class="cm-rostav">🔒</span><span class="cm-rostname">'+TEAM_SLOTS[j]+' pts</span></div>';}
+  html+='</div>';
+  if(slots<TEAM_SLOTS.length)html+='<div class="cm-sub" style="font-weight:700;font-size:12px;text-align:center;margin-bottom:6px">Earn '+(TEAM_SLOTS[slots]-points)+' more points to add another hero!</div>';
+  html+='<div class="cm-herobg" style="min-height:230px">'+heroSVG(ah,180)+'</div>';
+  html+='<input class="cm-input" style="margin:10px 0 4px;text-align:center" placeholder="Name this hero" value="'+esc(ah.hname||"")+'" data-act="hname" maxlength="16"/>';
+  html+='<div style="text-align:center;margin:6px 0 4px"><span class="cm-pill">⭐ '+points+' points</span></div>';
+  if(nextUnlock)html+='<div class="cm-sub" style="font-weight:700;font-size:13px;text-align:center;margin-bottom:8px">Next unlock: '+esc(nextUnlock.label)+' ('+nextUnlock.cost+' points)</div>';
+  CATS.forEach(function(cat){html+='<div style="font-weight:800;margin:12px 0 2px">'+cat.label+'</div><div class="cm-optgrid">';OPTIONS[cat.key].forEach(function(o){var unlocked=points>=o.cost;var sel=ah[cat.key]===o.id;var face=(cat.key==="sidekick"&&SIDEKICK[o.id])?('<span style="font-size:20px">'+SIDEKICK[o.id]+'</span>'):"";html+='<button class="cm-chip'+(sel?" sel":"")+(unlocked?"":" locked")+'" '+(unlocked?('data-act="part" data-cat="'+cat.key+'" data-opt="'+o.id+'"'):"")+'>'+(unlocked?"":'<span class="cm-lk">🔒</span>')+face+'<span>'+o.label+'</span><span class="cm-chipcost">'+(o.cost===0?"Free":unlocked?"✓":o.cost+" pts")+'</span></button>';});html+='</div>';});
+  html+='<button class="cm-btn ghost" data-act="nav" data-view="collection" style="margin-bottom:10px">🏅 My collection</button>';
+  html+='<button class="cm-btn" data-act="nav" data-view="home">🏠 Back</button></div>';
+  return html;}
+function collectionView(){var c=ctx();var p=c.p;var points=p.points||0;var got=COLLECTIBLES.filter(function(o){return points>=o.cost;}).length;
+  var html='<div class="cm-card"><div style="font-family:\'Baloo 2\';font-weight:800;font-size:22px;margin-bottom:4px">'+esc(p.name)+'\'s collection 🏅</div>';
+  html+='<div class="cm-sub" style="font-weight:700;font-size:13px;margin-bottom:12px">Treasures you unlock with points. You have '+got+' of '+COLLECTIBLES.length+'! These are just for collecting.</div>';
+  html+='<div class="cm-collgrid">';
+  COLLECTIBLES.forEach(function(o){var unlocked=points>=o.cost;html+='<div class="cm-coll'+(unlocked?"":" locked")+'"><span class="cm-collem">'+(unlocked?o.e:"❔")+'</span><span class="cm-collname">'+esc(o.label)+'</span><span class="cm-chipcost">'+(unlocked?"✓ Got it":o.cost+" pts")+'</span></div>';});
+  html+='</div>';
+  html+='<button class="cm-btn purple" data-act="nav" data-view="hero" style="margin-bottom:10px">🦸 Hero team</button><button class="cm-btn" data-act="nav" data-view="home">🏠 Back</button></div>';
+  return html;}
 function progressView(){var c=ctx();var p=c.p;var days=p.days;var dk=Object.keys(days).sort();var html='<div class="cm-card"><div style="font-family:\'Baloo 2\';font-weight:800;font-size:22px;margin-bottom:12px">'+esc(p.name)+'\'s progress 📈</div>';
  if(dk.length===0){html+='<p class="cm-sub" style="font-weight:700">No sessions yet. Once '+esc(p.name)+' finishes a day it shows here.</p>';}
  else{var totalQ=0,totalC=0;dk.forEach(function(k){totalQ+=days[k].total;totalC+=days[k].score;});var acc=totalQ?Math.round(totalC/totalQ*100):0;var extraTotal=0;dk.forEach(function(k){extraTotal+=days[k].extraQuestions||0;});var topicTotal=0,topicCorrect=0;dk.forEach(function(k){var tp=days[k].topics||{};for(var t in tp){topicTotal+=tp[t].t;topicCorrect+=tp[t].c;}});var allAcc=topicTotal?Math.round(topicCorrect/topicTotal*100):0;
@@ -378,7 +428,7 @@ function settingsView(){var c=ctx();var p=c.p;var stageBtns=[["preschool","Presc
  if(!c.phase.early){html+='<div style="font-weight:800;font-size:14px;margin:14px 0 6px">Challenge level</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';[["expected","Working at"],["greater","Greater depth"]].forEach(function(o){html+='<button class="cm-btn sm '+(p.depth===o[0]?"":"ghost")+'" style="width:100%" data-act="depth" data-v="'+o[0]+'">'+o[1]+'</button>';});html+='</div>';}
  html+='<button class="cm-btn ghost" style="color:var(--bad);border-color:#f6cdcf;margin-top:16px" data-act="reset">↺ Reset '+esc(p.name)+'\'s progress</button>';
  html+='<div class="cm-hr"></div><div style="font-weight:800;font-size:15px;margin-bottom:8px">Children</div>';
- for(var id in data.profiles){var pr=data.profiles[id];html+='<div class="cm-row"><span class="cm-profav">'+heroSVG(pr.hero,30)+'</span><div style="flex:1;font-weight:800">'+esc(pr.name)+'<div class="cm-sub" style="font-weight:700;font-size:12px">'+PHASES[resolvePhaseKey(pr,c.today)].label+'</div></div>'+(id!==data.activeId?('<button class="cm-btn ghost sm" data-act="switch" data-id="'+id+'">Use</button>'):"")+(Object.keys(data.profiles).length>1?('<button class="cm-iconbtn" style="color:var(--bad)" data-act="delchild" data-id="'+id+'">🗑️</button>'):"")+'</div>';}
+ for(var id in data.profiles){var pr=data.profiles[id];html+='<div class="cm-row"><span class="cm-profav">'+heroSVG(activeHeroOf(pr),30)+'</span><div style="flex:1;font-weight:800">'+esc(pr.name)+'<div class="cm-sub" style="font-weight:700;font-size:12px">'+PHASES[resolvePhaseKey(pr,c.today)].label+'</div></div>'+(id!==data.activeId?('<button class="cm-btn ghost sm" data-act="switch" data-id="'+id+'">Use</button>'):"")+(Object.keys(data.profiles).length>1?('<button class="cm-iconbtn" style="color:var(--bad)" data-act="delchild" data-id="'+id+'">🗑️</button>'):"")+'</div>';}
  html+='<div style="font-weight:800;font-size:14px;margin:14px 0 6px">Add a child</div><input class="cm-input" placeholder="Name" value="'+esc(S.newName)+'" data-act="newname"/><div class="cm-sub" style="font-weight:700;font-size:13px;margin:10px 0 6px">What are they in right now?</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';
  stageBtns.forEach(function(o){html+='<button class="cm-btn sm '+(S.newStage===o[0]?"":"ghost")+'" style="width:100%" data-act="stage" data-v="'+o[0]+'">'+o[1]+'</button>';});
  html+='</div><button class="cm-btn purple" style="margin-top:12px" data-act="add">➕ Add child</button>';
@@ -386,8 +436,8 @@ function settingsView(){var c=ctx();var p=c.p;var stageBtns=[["preschool","Presc
  return html;}
 
 /* ===================== RENDER ===================== */
-function render(){var app=document.getElementById("app");var showChrome=S.view!=="welcome";var showProf=["home","hero","progress","settings"].indexOf(S.view)>=0;var body="";
- if(S.view==="welcome")body=welcomeView();else if(S.view==="home")body=homeView();else if(S.view==="session")body=sessionView();else if(S.view==="results")body=resultsView();else if(S.view==="hero")body=heroView();else if(S.view==="progress")body=progressView();else if(S.view==="settings")body=settingsView();
+function render(){var app=document.getElementById("app");var showChrome=S.view!=="welcome";var showProf=["home","hero","progress","settings","collection"].indexOf(S.view)>=0;var body="";
+ if(S.view==="welcome")body=welcomeView();else if(S.view==="home")body=homeView();else if(S.view==="session")body=sessionView();else if(S.view==="results")body=resultsView();else if(S.view==="hero")body=heroView();else if(S.view==="collection")body=collectionView();else if(S.view==="progress")body=progressView();else if(S.view==="settings")body=settingsView();
  if(!showChrome){app.innerHTML=body;}else{app.innerHTML='<div class="cm-wrap">'+topBar()+(showProf?profileBar():"")+body+'</div>';}
  if(S.timer){clearInterval(S.timer);S.timer=null;}
  if(S.view==="session"){S.timer=setInterval(function(){var el=document.getElementById("cm-time");if(el)el.textContent=mmss(Math.floor((Date.now()-S.startedAt)/1000));},1000);
@@ -408,7 +458,9 @@ function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.ge
  else if(a==="nextq"){S.idx++;render();}
  else if(a==="prevq"){if(S.idx>0)S.idx--;render();}
  else if(a==="finish")finish();
- else if(a==="part"){var cat=t.getAttribute("data-cat"),opt=t.getAttribute("data-opt");P().hero[cat]=opt;save();render();}
+ else if(a==="part"){var cat=t.getAttribute("data-cat"),opt=t.getAttribute("data-opt");var pp=P();var h=Object.assign({},pp.heroes[pp.heroIndex]);h[cat]=opt;pp.heroes[pp.heroIndex]=h;save();render();}
+ else if(a==="selhero"){var pp=P();var i=parseInt(t.getAttribute("data-i"),10);if(i<pp.heroes.length){pp.heroIndex=i;save();render();}}
+ else if(a==="addhero"){var pp=P();if(pp.heroes.length<teamSize(pp.points||0)){pp.heroes.push(Object.assign({},DEFAULT_HERO));pp.heroIndex=pp.heroes.length-1;save();render();}}
  else if(a==="level"){P().level=t.getAttribute("data-v");save();render();}
  else if(a==="depth"){P().depth=t.getAttribute("data-v");save();render();}
  else if(a==="stage"){S.newStage=t.getAttribute("data-v");render();}
@@ -418,7 +470,7 @@ function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.ge
  else if(a==="calprev"){S.calOffset=(S.calOffset||0)-1;render();}
  else if(a==="calnext"){if((S.calOffset||0)<0){S.calOffset=(S.calOffset||0)+1;render();}}
 }
-function onChange(e){var t=e.target;if(!t.getAttribute)return;var a=t.getAttribute("data-act");if(a==="rename"){var v=t.value.trim();P().name=v||P().name;save();render();}}
+function onChange(e){var t=e.target;if(!t.getAttribute)return;var a=t.getAttribute("data-act");if(a==="rename"){var v=t.value.trim();P().name=v||P().name;save();render();}else if(a==="hname"){var pp=P();var h=Object.assign({},pp.heroes[pp.heroIndex]);h.hname=t.value.slice(0,16);pp.heroes[pp.heroIndex]=h;save();}}
 function onInput(e){var t=e.target;if(!t.getAttribute)return;if(t.getAttribute("data-act")==="newname")S.newName=t.value;}
 
 /* ===================== PWA ICON / MANIFEST ===================== */
