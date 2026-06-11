@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="Maths Minutes">
 <meta name="theme-color" content="#0E9384">
 <title>Maths Minutes</title>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap');
 html,body{margin:0;padding:0;min-height:100%}
@@ -136,25 +136,32 @@ var FIREBASE_CONFIG={
 var FAMILY_CODE="murray-7f3k9q2x-home";
 /* ============================================================ */
 /* ===================== DATA ===================== */
-var LS="maths_minutes_v3";
+var LS="maths_minutes_v3";var BUILD="2026-06-09d";
 var DEFAULT_HERO={suit:"blue",cape:"red",mask:"classic",emblem:"star",accessory:"none",aura:"none",sidekick:"none"};
 function defaultMulti(){return{activeId:"charlie",profiles:{
- charlie:{id:"charlie",name:"Charlie",cohort:2024,level:"auto",depth:"greater",points:0,hero:Object.assign({},DEFAULT_HERO),days:{}},
- freddie:{id:"freddie",name:"Freddie",cohort:2026,level:"auto",depth:"expected",points:0,hero:Object.assign({},DEFAULT_HERO,{suit:"red",cape:"blue"}),days:{}}
+ charlie:{id:"charlie",name:"Charlie",cohort:2024,level:"auto",depth:"greater",points:0,boost:0,heroes:[Object.assign({},DEFAULT_HERO)],heroIndex:0,days:{}},
+ freddie:{id:"freddie",name:"Freddie",cohort:2026,level:"auto",depth:"expected",points:0,boost:0,heroes:[Object.assign({},DEFAULT_HERO,{suit:"red",cape:"blue"})],heroIndex:0,days:{}}
 }};}
 function fixHero(h){return Object.assign({},DEFAULT_HERO,h||{});}
 function fixProfile(p,id){var heroes;if(Array.isArray(p.heroes)&&p.heroes.length)heroes=p.heroes.map(fixHero);else if(p.hero)heroes=[fixHero(p.hero)];else heroes=[Object.assign({},DEFAULT_HERO)];var heroIndex=Math.min(p.heroIndex||0,heroes.length-1);if(heroIndex<0)heroIndex=0;return{id:p.id||id,name:p.name||"Child",cohort:(p.cohort==null?2024:p.cohort),level:p.level||"auto",depth:p.depth||"expected",points:p.points||0,boost:p.boost||0,heroes:heroes,heroIndex:heroIndex,days:p.days||{},updatedAt:p.updatedAt||0};}
-function activeHeroOf(pr){return pr.heroes[Math.min(pr.heroIndex||0,pr.heroes.length-1)]||pr.heroes[0];}
+function activeHeroOf(pr){if(!pr||!pr.heroes||!pr.heroes.length){if(pr&&pr.hero)return fixHero(pr.hero);return Object.assign({},DEFAULT_HERO);}return pr.heroes[Math.min(pr.heroIndex||0,pr.heroes.length-1)]||pr.heroes[0];}
 function mergeMulti(d){if(!d||!d.profiles||!Object.keys(d.profiles).length)return defaultMulti();var profiles={};for(var id in d.profiles)profiles[id]=fixProfile(d.profiles[id],id);var activeId=(d.activeId&&profiles[d.activeId])?d.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
 function load(){try{var r=localStorage.getItem(LS);return r?mergeMulti(JSON.parse(r)):defaultMulti();}catch(e){return defaultMulti();}}
 var DB=null,FAM_REF=null,SYNC=false;
+var SYNC_STATUS={state:"connecting",detail:""},SYNC_LAST=0;
+function setSync(state,detail){SYNC_STATUS.state=state;if(detail!=null)SYNC_STATUS.detail=String(detail);if(state==="ok")SYNC_LAST=Date.now();}
+function localBeatsRemote(remote){var rprof=(remote&&remote.profiles)||{};for(var id in data.profiles){var lp=data.profiles[id],rp=rprof[id];if(!rp)return true;if((lp.points||0)>(rp.points||0))return true;if((lp.updatedAt||0)>(rp.updatedAt||0))return true;var ld=lp.days||{},rd=rp.days||{};for(var k in ld){if(!rd[k])return true;var lt=ld[k],rt=rd[k];if((lt.total||0)>(rt.total||0))return true;if((lt.extraQuestions||0)>(rt.extraQuestions||0))return true;if(lt.qs&&!rt.qs)return true;}}return false;}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(data));}catch(e){}}
 function save(){var p=P();if(p)p.updatedAt=Date.now();saveLocal();pushCloud();}
 function mergeDay(x,y){if(!x)return y;if(!y)return x;var summed={};[x,y].forEach(function(rec){var tp=rec.topics||{};for(var t in tp){if(!summed[t])summed[t]={c:0,t:0};summed[t].c+=tp[t].c;summed[t].t+=tp[t].t;}});var best=((y.finishedAt||"")>(x.finishedAt||""))?y:x;var dailyA=(x.total||0),dailyB=(y.total||0);var dailySrc=dailyB>=dailyA?y:x;return Object.assign({},best,{score:dailySrc.score||0,total:dailySrc.total||0,chScore:dailySrc.chScore||0,chTotal:dailySrc.chTotal||0,qs:dailySrc.qs||best.qs,answers:dailySrc.answers||best.answers,topics:summed,pointsEarned:Math.max(x.pointsEarned||0,y.pointsEarned||0),extraQuestions:Math.max(x.extraQuestions||0,y.extraQuestions||0)});}
 function mergeProfileObj(a,b){if(!a)return b;if(!b)return a;var days=Object.assign({},a.days||{});var bd=b.days||{};for(var k in bd){days[k]=mergeDay(days[k],bd[k]);}var base=((b.updatedAt||0)>(a.updatedAt||0))?b:a;return Object.assign({},base,{days:days,points:Math.max(a.points||0,b.points||0)});}
 function mergeData(localD,remote){if(!remote||!remote.profiles)return localD;var profiles=Object.assign({},localD.profiles);for(var id in remote.profiles){profiles[id]=fixProfile(mergeProfileObj(profiles[id],remote.profiles[id]),id);}var activeId=(localD.activeId&&profiles[localD.activeId])?localD.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
-function pushCloud(){if(!SYNC||!FAM_REF)return;try{FAM_REF.set({profiles:data.profiles,updatedAt:Date.now()});}catch(e){}}
-function initSync(){try{if(typeof firebase==="undefined")return;if(!FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey).indexOf("PASTE")>=0)return;firebase.initializeApp(FIREBASE_CONFIG);DB=firebase.database();FAM_REF=DB.ref("families/"+FAMILY_CODE);SYNC=true;FAM_REF.on("value",function(snap){var remote=snap.val();if(!remote){pushCloud();return;}data=mergeData(data,remote);saveLocal();if(S.view!=="session"&&S.view!=="settings"&&S.view!=="welcome")render();});}catch(e){SYNC=false;}}
+function pushCloud(){if(!SYNC||!FAM_REF)return;try{var pr=FAM_REF.set({profiles:data.profiles,updatedAt:Date.now()});if(pr&&pr.then)pr.then(function(){setSync("ok","");}).catch(function(err){setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"write blocked");});}catch(e){setSync("error",e&&e.message?e.message:"write failed");}}
+function syncPull(){if(!FAM_REF)return;try{FAM_REF.once("value").then(function(snap){var r=snap.val();setSync("ok","");if(!r)return;var before=JSON.stringify(data.profiles);data=mergeData(data,r);saveLocal();if(localBeatsRemote(r))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="welcome")render();else if(S.view==="settings")render();}).catch(function(e){setSync("error",(e&&e.code)?e.code:(e&&e.message)?e.message:"read blocked");});}catch(e){}}
+function initSync(){try{if(typeof firebase==="undefined"){setSync("off","Cloud library did not load");return;}if(!FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey).indexOf("PASTE")>=0){setSync("off","No cloud set up");return;}firebase.initializeApp(FIREBASE_CONFIG);DB=firebase.database();FAM_REF=DB.ref("families/"+FAMILY_CODE);SYNC=true;setSync("connecting","");
+ try{DB.ref(".info/connected").on("value",function(s){if(s.val()===true){if(SYNC_STATUS.state==="connecting")setSync("ok","");}else if(SYNC_STATUS.state==="ok"){setSync("connecting","");}});}catch(e){}
+ FAM_REF.on("value",function(snap){var remote=snap.val();setSync("ok","");if(!remote){pushCloud();return;}var before=JSON.stringify(data.profiles);data=mergeData(data,remote);saveLocal();if(localBeatsRemote(remote))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="settings"&&S.view!=="welcome")render();},function(err){SYNC=false;setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"read blocked");});
+ }catch(e){SYNC=false;setSync("error",e&&e.message?e.message:"init failed");}}
 
 /* ===================== RANDOM ===================== */
 function xmur3(s){var h=1779033703^s.length;for(var i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19);}return function(){h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);return(h^=h>>>16)>>>0;};}
@@ -167,6 +174,7 @@ function shuffle(rng,arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=
 /* ===================== DATES ===================== */
 function fmt(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function todayStr(){return fmt(new Date());}
+function timeAgo(ts){var s=Math.max(0,Math.floor((Date.now()-ts)/1000));if(s<10)return"just now";if(s<60)return s+"s ago";var m=Math.floor(s/60);if(m<60)return m+(m===1?" min ago":" mins ago");var h=Math.floor(m/60);if(h<24)return h+(h===1?" hour ago":" hours ago");var d=Math.floor(h/24);return d+(d===1?" day ago":" days ago");}
 function parseD(s){return new Date(s+"T00:00:00");}
 function prettyDate(s){return parseD(s).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});}
 function schoolStartYear(ds){var p=ds.split("-").map(Number);return p[1]>=9?p[0]:p[0]-1;}
@@ -323,11 +331,17 @@ var boostMsg=null;
 if(!S.bonus&&!c.phase.early&&total>0){var comboC=score+chScore,comboT=total+chTotal;var comboAcc=comboT?comboC/comboT:0;var aced=(score===total)&&(chTotal===0||chScore>=Math.ceil(chTotal*0.75));var oldB=c.p.boost||0,newB=oldB;if(aced)newB=Math.min(5,oldB+1);else if(comboAcc<0.55)newB=Math.max(0,oldB-1);c.p.boost=newB;if(newB>oldB)boostMsg="up";else if(newB<oldB)boostMsg="down";}
 save();S.results={res:res,score:score,total:total,chScore:chScore,chTotal:chTotal,dur:dur,earned:earned,daily:daily,newly:newly,newPoints:newPoints,bonus:S.bonus,boostMsg:boostMsg,boost:c.p.boost||0};S.view="results";render();}
 function reviewToday(){var c=ctx();var rec=c.p.days[c.today];var res;
- if(rec.qs&&rec.qs.length){res=rec.qs.map(function(q,i){var g=(rec.answers&&rec.answers[i])||"";return Object.assign({},q,{given:g,ok:isRight(q,g)});});}
- else{var total=rec.total||0;var chN=(rec.answers?rec.answers.length:total)-total;var base=PHASES[c.baseKey];var qs=buildQuestions(c.today,base,"",total);if(chN>0){var ch=buildQuestions(c.today,PHASES[NEXT[c.baseKey]],"challenge",chN).map(function(q){q.challenger=true;return q;});qs=qs.concat(ch);}qs=qs.map(function(q,i){q.id=i;return q;});res=qs.map(function(q,i){var g=(rec.answers&&rec.answers[i])||"";return Object.assign({},q,{given:g,ok:isRight(q,g)});});}
+ var total=rec.total||0;
+ var chN=rec.chTotal!=null?rec.chTotal:Math.max(0,(rec.answers&&rec.answers.length>total)?rec.answers.length-total:0);
+ if(rec.qs&&rec.qs.length){
+  var hasChallengers=rec.qs.some(function(q){return q.challenger;});
+  var qs=rec.qs.slice();
+  if(!hasChallengers&&chN>0){var ch=buildQuestions(c.today,PHASES[NEXT[c.baseKey]],"challenge",chN).map(function(q){q.challenger=true;return q;});qs=qs.concat(ch);}
+  res=qs.map(function(q,i){var g=(rec.answers&&rec.answers[i]!=null)?rec.answers[i]:"";return Object.assign({},q,{given:g,ok:isRight(q,g)});});}
+ else{var base=PHASES[c.baseKey];var qs2=buildQuestions(c.today,base,"",total);if(chN>0){var ch=buildQuestions(c.today,PHASES[NEXT[c.baseKey]],"challenge",chN).map(function(q){q.challenger=true;return q;});qs2=qs2.concat(ch);}qs2=qs2.map(function(q,i){q.id=i;return q;});res=qs2.map(function(q,i){var g=(rec.answers&&rec.answers[i]!=null)?rec.answers[i]:"";return Object.assign({},q,{given:g,ok:isRight(q,g)});});}
  var chRes=res.filter(function(r){return r.challenger;});S.results={res:res,score:rec.score,total:rec.total,chScore:rec.chScore!=null?rec.chScore:chRes.filter(function(r){return r.ok;}).length,chTotal:rec.chTotal!=null?rec.chTotal:chRes.length,dur:rec.durationSec,earned:rec.pointsEarned||0,newly:[],newPoints:c.p.points||0,review:true};S.bonus=false;S.view="results";render();}
 function switchProfile(id){if("speechSynthesis"in window)window.speechSynthesis.cancel();data.activeId=id;save();S.results=null;S.view="home";render();}
-function addProfile(){var nm=(S.newName||"").trim()||"Child";var id=(nm.toLowerCase().replace(/[^a-z0-9]/g,"")||"child")+"-"+Date.now().toString(36);data.profiles[id]={id:id,name:nm,cohort:cohortFromStage(S.newStage,todayStr()),level:"auto",depth:"expected",points:0,hero:Object.assign({},DEFAULT_HERO),days:{}};data.activeId=id;S.newName="";save();S.view="home";render();}
+function addProfile(){var nm=(S.newName||"").trim()||"Child";var id=(nm.toLowerCase().replace(/[^a-z0-9]/g,"")||"child")+"-"+Date.now().toString(36);data.profiles[id]={id:id,name:nm,cohort:cohortFromStage(S.newStage,todayStr()),level:"auto",depth:"expected",points:0,boost:0,heroes:[Object.assign({},DEFAULT_HERO)],heroIndex:0,days:{}};data.activeId=id;S.newName="";save();S.view="home";render();}
 function deleteProfile(id){if(Object.keys(data.profiles).length<=1)return;if(!confirm("Remove "+data.profiles[id].name+" and all their progress?"))return;delete data.profiles[id];if(data.activeId===id)data.activeId=Object.keys(data.profiles)[0];save();render();}
 function resetActive(){var p=P();if(!confirm("Clear "+p.name+"'s progress, points and hero? This cannot be undone."))return;p.points=0;p.boost=0;p.days={};p.heroes=[Object.assign({},DEFAULT_HERO)];p.heroIndex=0;save();S.view="home";render();}
 
@@ -454,7 +468,14 @@ function settingsView(){var c=ctx();var p=c.p;var stageBtns=[["preschool","Presc
  html+='<div style="font-weight:800;font-size:14px;margin:14px 0 6px">Add a child</div><input class="cm-input" placeholder="Name" value="'+esc(S.newName)+'" data-act="newname"/><div class="cm-sub" style="font-weight:700;font-size:13px;margin:10px 0 6px">What are they in right now?</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';
  stageBtns.forEach(function(o){html+='<button class="cm-btn sm '+(S.newStage===o[0]?"":"ghost")+'" style="width:100%" data-act="stage" data-v="'+o[0]+'">'+o[1]+'</button>';});
  html+='</div><button class="cm-btn purple" style="margin-top:12px" data-act="add">➕ Add child</button>';
- html+='<div class="cm-sub" style="font-weight:700;font-size:13px;margin:16px 0 4px">Each child has their own questions, points and superhero. '+(SYNC?"Progress syncs across every phone running this app. ☁️":"Saving on this device only. Add your Firebase details in the file to sync across phones.")+'</div><div style="margin-top:8px"><button class="cm-btn" data-act="nav" data-view="home">🏠 Back</button></div></div>';
+ var syncMap={ok:["#e6f7f1","#0a7367","☁️ Connected and syncing"],connecting:["#fff4d6","#8a5a00","🔄 Connecting to the cloud…"],error:["#fdecee","#b3261e","⚠️ Not syncing"],off:["#f1ece2","#7c8a87","📴 This device only"]};
+ var sm=syncMap[SYNC_STATUS.state]||syncMap.connecting;var when=SYNC_LAST?("Last synced "+timeAgo(SYNC_LAST)):"Not synced yet this session";
+ html+='<div class="cm-hr"></div><div style="font-weight:800;font-size:15px;margin-bottom:8px">Cloud sync</div>';
+ html+='<div style="background:'+sm[0]+';color:'+sm[1]+';border-radius:14px;padding:12px 14px;font-weight:800;font-size:14px">'+sm[2]+'<div style="font-weight:700;font-size:12px;margin-top:4px;opacity:.85">'+when+(SYNC_STATUS.detail?(' · '+esc(SYNC_STATUS.detail)):"")+'</div></div>';
+ html+='<button class="cm-btn ghost sm" style="margin-top:10px" data-act="syncnow">🔄 Sync now</button>';
+ html+='<div class="cm-sub" style="font-weight:700;font-size:13px;margin:12px 0 4px">Each child has their own questions, points and superhero. '+(SYNC?"Progress is shared across every phone running this app.":"Add your Firebase details in the file to sync across phones.")+'</div>';
+ html+='<div class="cm-sub" style="font-size:11px;color:var(--muted);margin-top:6px">Version '+BUILD+'</div>';
+ html+='<div style="margin-top:10px"><button class="cm-btn" data-act="nav" data-view="home">🏠 Back</button></div></div>';
  return html;}
 
 /* ===================== RENDER ===================== */
@@ -469,6 +490,7 @@ function render(){var app=document.getElementById("app");var showChrome=S.view!=
 /* ===================== EVENTS ===================== */
 function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.getAttribute("data-act");var q=S.questions[S.idx];
  if(a==="nav"){S.view=t.getAttribute("data-view");S.calOffset=0;if("speechSynthesis"in window)window.speechSynthesis.cancel();render();}
+ else if(a==="syncnow"){if(FAM_REF){try{pushCloud();FAM_REF.once("value").then(function(snap){var r=snap.val();if(r){data=mergeData(data,r);saveLocal();if(localBeatsRemote(r))pushCloud();}setSync("ok","");render();}).catch(function(e){setSync("error",(e&&e.code)?e.code:(e&&e.message)?e.message:"read blocked");render();});}catch(e){setSync("error",e&&e.message?e.message:"failed");render();}}else{render();}}
  else if(a==="switch")switchProfile(t.getAttribute("data-id"));
  else if(a==="start")startSession(t.getAttribute("data-bonus")==="1");
  else if(a==="review")reviewToday();
@@ -502,12 +524,19 @@ function makeIcon(size){var c=document.createElement("canvas");c.width=c.height=
 function setupPWA(){try{var i192=makeIcon(192),i512=makeIcon(512);var al=document.createElement("link");al.rel="apple-touch-icon";al.href=i192;document.head.appendChild(al);var mn={name:"Maths Minutes",short_name:"Maths",start_url:".",display:"standalone",background_color:"#FFF7EC",theme_color:"#0E9384",icons:[{src:i192,sizes:"192x192",type:"image/png"},{src:i512,sizes:"512x512",type:"image/png"}]};var b=new Blob([JSON.stringify(mn)],{type:"application/json"});var ml=document.createElement("link");ml.rel="manifest";ml.href=URL.createObjectURL(b);document.head.appendChild(ml);}catch(e){}}
 
 /* ===================== INIT ===================== */
-document.getElementById("app").addEventListener("click",onClick);
-document.addEventListener("change",onChange);
-document.addEventListener("input",onInput);
-setupPWA();
-render();
-initSync();
+function showBootError(e){try{var app=document.getElementById("app");if(app&&(!app.innerHTML||app.innerHTML.replace(/\s/g,"").length<20)){var msg=(e&&e.message)?e.message:String(e);var stack=(e&&e.stack)?String(e.stack).slice(0,400):"";app.innerHTML='<div style="max-width:560px;margin:0 auto;padding:24px;font-family:sans-serif;color:#26302f"><div style="font-size:40px;text-align:center">\uD83D\uDD27</div><h2 style="text-align:center">The app hit a snag starting up</h2><p style="text-align:center;color:#7c8a87">Please screenshot this and send it to Dad so he can fix it.</p><pre style="white-space:pre-wrap;background:#fff;border:1px solid #ece3d4;border-radius:12px;padding:12px;font-size:12px;color:#b3261e">'+msg+(stack?("\n\n"+stack):"")+'</pre><button onclick="location.reload()" style="display:block;margin:14px auto 0;padding:12px 20px;border:0;border-radius:12px;background:#0E9384;color:#fff;font-weight:800;font-size:16px">Try again</button></div>';}}catch(_){}}
+window.onerror=function(m,src,ln,col,err){showBootError(err||m);};
+try{
+ document.getElementById("app").addEventListener("click",onClick);
+ document.addEventListener("change",onChange);
+ document.addEventListener("input",onInput);
+ try{setupPWA();}catch(e){}
+ render();
+}catch(e){showBootError(e);}
+function startSync(tries){try{if(typeof firebase!=="undefined"){initSync();return;}}catch(e){}if((tries||0)<60)setTimeout(function(){startSync((tries||0)+1);},150);}
+startSync(0);
+try{document.addEventListener("visibilitychange",function(){if(!document.hidden)syncPull();});}catch(e){}
+try{window.addEventListener("focus",syncPull);window.addEventListener("pageshow",syncPull);}catch(e){}
 </script>
 </body>
 </html>
