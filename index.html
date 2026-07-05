@@ -136,7 +136,7 @@ var FIREBASE_CONFIG={
 var FAMILY_CODE="murray-7f3k9q2x-home";
 /* ============================================================ */
 /* ===================== DATA ===================== */
-var LS="maths_minutes_v3";var BUILD="2026-06-09d";
+var LS="maths_minutes_v3";var BUILD="2026-06-09e";
 var DEFAULT_HERO={suit:"blue",cape:"red",mask:"classic",emblem:"star",accessory:"none",aura:"none",sidekick:"none"};
 function defaultMulti(){return{activeId:"charlie",profiles:{
  charlie:{id:"charlie",name:"Charlie",cohort:2024,level:"auto",depth:"greater",points:0,boost:0,heroes:[Object.assign({},DEFAULT_HERO)],heroIndex:0,days:{}},
@@ -147,7 +147,7 @@ function fixProfile(p,id){var heroes;if(Array.isArray(p.heroes)&&p.heroes.length
 function activeHeroOf(pr){if(!pr||!pr.heroes||!pr.heroes.length){if(pr&&pr.hero)return fixHero(pr.hero);return Object.assign({},DEFAULT_HERO);}return pr.heroes[Math.min(pr.heroIndex||0,pr.heroes.length-1)]||pr.heroes[0];}
 function mergeMulti(d){if(!d||!d.profiles||!Object.keys(d.profiles).length)return defaultMulti();var profiles={};for(var id in d.profiles)profiles[id]=fixProfile(d.profiles[id],id);var activeId=(d.activeId&&profiles[d.activeId])?d.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
 function load(){try{var r=localStorage.getItem(LS);return r?mergeMulti(JSON.parse(r)):defaultMulti();}catch(e){return defaultMulti();}}
-var DB=null,FAM_REF=null,SYNC=false;
+var DB=null,FAM_REF=null,SYNC=false,PULL_QUEUED=false,SYNCING=false;
 var SYNC_STATUS={state:"connecting",detail:""},SYNC_LAST=0;
 function setSync(state,detail){SYNC_STATUS.state=state;if(detail!=null)SYNC_STATUS.detail=String(detail);if(state==="ok")SYNC_LAST=Date.now();}
 function localBeatsRemote(remote){var rprof=(remote&&remote.profiles)||{};for(var id in data.profiles){var lp=data.profiles[id],rp=rprof[id];if(!rp)return true;if((lp.points||0)>(rp.points||0))return true;if((lp.updatedAt||0)>(rp.updatedAt||0))return true;var ld=lp.days||{},rd=rp.days||{};for(var k in ld){if(!rd[k])return true;var lt=ld[k],rt=rd[k];if((lt.total||0)>(rt.total||0))return true;if((lt.extraQuestions||0)>(rt.extraQuestions||0))return true;if(lt.qs&&!rt.qs)return true;}}return false;}
@@ -157,8 +157,8 @@ function mergeDay(x,y){if(!x)return y;if(!y)return x;var summed={};[x,y].forEach
 function mergeProfileObj(a,b){if(!a)return b;if(!b)return a;var days=Object.assign({},a.days||{});var bd=b.days||{};for(var k in bd){days[k]=mergeDay(days[k],bd[k]);}var base=((b.updatedAt||0)>(a.updatedAt||0))?b:a;return Object.assign({},base,{days:days,points:Math.max(a.points||0,b.points||0)});}
 function mergeData(localD,remote){if(!remote||!remote.profiles)return localD;var profiles=Object.assign({},localD.profiles);for(var id in remote.profiles){profiles[id]=fixProfile(mergeProfileObj(profiles[id],remote.profiles[id]),id);}var activeId=(localD.activeId&&profiles[localD.activeId])?localD.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
 function pushCloud(){if(!SYNC||!FAM_REF)return;try{var pr=FAM_REF.set({profiles:data.profiles,updatedAt:Date.now()});if(pr&&pr.then)pr.then(function(){setSync("ok","");}).catch(function(err){setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"write blocked");});}catch(e){setSync("error",e&&e.message?e.message:"write failed");}}
-function syncPull(){if(!FAM_REF)return;try{FAM_REF.once("value").then(function(snap){var r=snap.val();setSync("ok","");if(!r)return;var before=JSON.stringify(data.profiles);data=mergeData(data,r);saveLocal();if(localBeatsRemote(r))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="welcome")render();else if(S.view==="settings")render();}).catch(function(e){setSync("error",(e&&e.code)?e.code:(e&&e.message)?e.message:"read blocked");});}catch(e){}}
-function initSync(){try{if(typeof firebase==="undefined"){setSync("off","Cloud library did not load");return;}if(!FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey).indexOf("PASTE")>=0){setSync("off","No cloud set up");return;}firebase.initializeApp(FIREBASE_CONFIG);DB=firebase.database();FAM_REF=DB.ref("families/"+FAMILY_CODE);SYNC=true;setSync("connecting","");
+function syncPull(){if(!FAM_REF){PULL_QUEUED=true;return;}PULL_QUEUED=false;SYNCING=true;if(S.view==="home"||S.view==="progress")render();try{FAM_REF.once("value").then(function(snap){SYNCING=false;var r=snap.val();setSync("ok","");if(!r){if(S.view==="home"||S.view==="progress")render();return;}var before=JSON.stringify(data.profiles);data=mergeData(data,r);saveLocal();if(localBeatsRemote(r))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="welcome")render();else if(S.view==="settings"||S.view==="home"||S.view==="progress")render();}).catch(function(e){SYNCING=false;setSync("error",(e&&e.code)?e.code:(e&&e.message)?e.message:"read blocked");if(S.view==="home"||S.view==="progress")render();});}catch(e){SYNCING=false;}}
+function initSync(){try{if(typeof firebase==="undefined"){setSync("off","Cloud library did not load");return;}if(!FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey).indexOf("PASTE")>=0){setSync("off","No cloud set up");return;}firebase.initializeApp(FIREBASE_CONFIG);DB=firebase.database();FAM_REF=DB.ref("families/"+FAMILY_CODE);SYNC=true;setSync("connecting","");syncPull();
  try{DB.ref(".info/connected").on("value",function(s){if(s.val()===true){if(SYNC_STATUS.state==="connecting")setSync("ok","");}else if(SYNC_STATUS.state==="ok"){setSync("connecting","");}});}catch(e){}
  FAM_REF.on("value",function(snap){var remote=snap.val();setSync("ok","");if(!remote){pushCloud();return;}var before=JSON.stringify(data.profiles);data=mergeData(data,remote);saveLocal();if(localBeatsRemote(remote))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="settings"&&S.view!=="welcome")render();},function(err){SYNC=false;setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"read blocked");});
  }catch(e){SYNC=false;setSync("error",e&&e.message?e.message:"init failed");}}
@@ -372,7 +372,7 @@ function welcomeView(){var hero=P()?activeHeroOf(P()):DEFAULT_HERO;
   '</div>'+
  '</div>';}
 function homeView(){var c=ctx();var p=c.p;var cnt=c.phase.count||(c.phase.early?6:8);var chN=c.phase.challengers==null?(c.phase.early?2:4):c.phase.challengers;var done=!!p.days[c.today];var prev=buildQuestions(c.today,c.mainPhase,"",cnt);var focus=[];prev.forEach(function(q){if(focus.indexOf(q.label)<0)focus.push(q.label);});focus=focus.slice(0,4);var points=p.points||0;var nextUnlock=null;for(var i=0;i<UNLOCKS.length;i++){if(UNLOCKS[i].cost>points){nextUnlock=UNLOCKS[i];break;}}
- var html='<div class="cm-card"><div class="cm-greet">Hi '+esc(p.name)+'! 👋</div><div class="cm-sub">'+prettyDate(c.today)+'</div>';
+ var html='<div class="cm-card"><div class="cm-greet">Hi '+esc(p.name)+'! 👋</div><div class="cm-sub">'+prettyDate(c.today)+(SYNCING?' <span class="cm-pill" style="font-size:11px;padding:2px 8px;background:#fff4d6;color:#8a5a00;vertical-align:middle">☁️ syncing…</span>':'')+'</div>';
  if(!done){html+='<p style="font-weight:800;margin:16px 0 2px">Today\'s maths is ready.</p><div class="cm-sub" style="font-weight:700">'+cnt+' questions'+(chN>0?(' plus '+chN+' challenger'+(chN>1?"s":"")+' 🚀'):"")+'</div>';
   if(!c.phase.early&&(c.boost||0)>0)html+='<div class="cm-sub" style="font-weight:800;font-size:13px;margin-top:6px;color:var(--accent-d)">\uD83D\uDCAA Challenge level '+c.boost+' \u2014 harder questions</div>';
   html+='<div class="cm-focus">'+focus.map(function(t){return'<span class="cm-tag">'+esc(t)+'</span>';}).join("")+'</div>';
@@ -533,7 +533,7 @@ try{
  try{setupPWA();}catch(e){}
  render();
 }catch(e){showBootError(e);}
-function startSync(tries){try{if(typeof firebase!=="undefined"){initSync();return;}}catch(e){}if((tries||0)<60)setTimeout(function(){startSync((tries||0)+1);},150);}
+function startSync(tries){try{if(typeof firebase!=="undefined"){initSync();if(PULL_QUEUED)syncPull();return;}}catch(e){}if((tries||0)<60)setTimeout(function(){startSync((tries||0)+1);},150);}
 startSync(0);
 try{document.addEventListener("visibilitychange",function(){if(!document.hidden)syncPull();});}catch(e){}
 try{window.addEventListener("focus",syncPull);window.addEventListener("pageshow",syncPull);}catch(e){}
