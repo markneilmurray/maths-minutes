@@ -22,11 +22,11 @@ background:radial-gradient(900px 500px at 110% -10%,#d6f3ee 0,transparent 55%),r
 .cm-wrap{max-width:560px;margin:0 auto;padding:16px 16px calc(44px + env(safe-area-inset-bottom))}
 .cm-card{background:var(--card);border:2px solid var(--line);border-radius:26px;padding:20px;box-shadow:0 10px 0 -4px #f0e7d6,0 18px 40px -22px rgba(20,40,38,.35)}
 .cm-card.ch{border-color:#caa6ef;box-shadow:0 10px 0 -4px #e6d6fb,0 18px 40px -22px rgba(70,30,120,.3)}
-.cm-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;padding-top:env(safe-area-inset-top)}
+.cm-topbar{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding-top:env(safe-area-inset-top)}.cm-topbar-row{display:flex;align-items:center;justify-content:space-between;gap:6px}.cm-topbar-pills{display:flex;gap:6px}
 .cm-logo{display:flex;align-items:center;gap:9px;font-family:'Baloo 2';font-weight:800;font-size:19px}
 .cm-dot{width:32px;height:32px;border-radius:10px;background:var(--primary);display:grid;place-items:center;color:#fff;box-shadow:0 4px 0 var(--primary-d);font-size:17px}
-.cm-pill{display:inline-flex;align-items:center;gap:5px;background:#fff;border:2px solid var(--line);border-radius:999px;padding:5px 10px;font-weight:800;font-size:13px}
-.cm-iconbtn{border:2px solid var(--line);background:#fff;border-radius:12px;min-width:38px;height:38px;padding:0 8px;display:grid;place-items:center;cursor:pointer;color:var(--ink);font-size:18px}
+.cm-pill{display:inline-flex;align-items:center;gap:5px;background:#fff;border:2px solid var(--line);border-radius:999px;padding:5px 10px;font-weight:800;font-size:13px}.cm-pill.sm{padding:3px 9px;font-size:12px}
+.cm-iconbtn{border:2px solid var(--line);background:#fff;border-radius:12px;min-width:36px;height:36px;padding:0 6px;display:grid;place-items:center;cursor:pointer;color:var(--ink);font-size:17px}
 .cm-iconbtn.on{background:var(--primary);color:#fff;border-color:var(--primary)}
 .cm-profiles{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}
 .cm-prof{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:6px 13px 6px 7px;font-family:'Baloo 2';font-weight:800;cursor:pointer;white-space:nowrap;font-size:15px}
@@ -136,7 +136,7 @@ var FIREBASE_CONFIG={
 var FAMILY_CODE="murray-7f3k9q2x-home";
 /* ============================================================ */
 /* ===================== DATA ===================== */
-var LS="maths_minutes_v3";var BUILD="2026-06-09e";
+var LS="maths_minutes_v3";var BUILD="2026-08-02b";
 var DEFAULT_HERO={suit:"blue",cape:"red",mask:"classic",emblem:"star",accessory:"none",aura:"none",sidekick:"none"};
 function defaultMulti(){return{activeId:"charlie",profiles:{
  charlie:{id:"charlie",name:"Charlie",cohort:2024,level:"auto",depth:"greater",points:0,boost:0,heroes:[Object.assign({},DEFAULT_HERO)],heroIndex:0,days:{}},
@@ -156,7 +156,8 @@ function save(){var p=P();if(p)p.updatedAt=Date.now();saveLocal();pushCloud();}
 function mergeDay(x,y){if(!x)return y;if(!y)return x;var summed={};[x,y].forEach(function(rec){var tp=rec.topics||{};for(var t in tp){if(!summed[t])summed[t]={c:0,t:0};summed[t].c+=tp[t].c;summed[t].t+=tp[t].t;}});var best=((y.finishedAt||"")>(x.finishedAt||""))?y:x;var dailyA=(x.total||0),dailyB=(y.total||0);var dailySrc=dailyB>=dailyA?y:x;return Object.assign({},best,{score:dailySrc.score||0,total:dailySrc.total||0,chScore:dailySrc.chScore||0,chTotal:dailySrc.chTotal||0,qs:dailySrc.qs||best.qs,answers:dailySrc.answers||best.answers,topics:summed,pointsEarned:Math.max(x.pointsEarned||0,y.pointsEarned||0),extraQuestions:Math.max(x.extraQuestions||0,y.extraQuestions||0)});}
 function mergeProfileObj(a,b){if(!a)return b;if(!b)return a;var days=Object.assign({},a.days||{});var bd=b.days||{};for(var k in bd){days[k]=mergeDay(days[k],bd[k]);}var base=((b.updatedAt||0)>(a.updatedAt||0))?b:a;return Object.assign({},base,{days:days,points:Math.max(a.points||0,b.points||0)});}
 function mergeData(localD,remote){if(!remote||!remote.profiles)return localD;var profiles=Object.assign({},localD.profiles);for(var id in remote.profiles){profiles[id]=fixProfile(mergeProfileObj(profiles[id],remote.profiles[id]),id);}var activeId=(localD.activeId&&profiles[localD.activeId])?localD.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
-function pushCloud(){if(!SYNC||!FAM_REF)return;try{var pr=FAM_REF.set({profiles:data.profiles,updatedAt:Date.now()});if(pr&&pr.then)pr.then(function(){setSync("ok","");}).catch(function(err){setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"write blocked");});}catch(e){setSync("error",e&&e.message?e.message:"write failed");}}
+function sanitiseForFirebase(obj){return JSON.parse(JSON.stringify(obj,function(k,v){return v===undefined?null:v;}));}
+function pushCloud(){if(!SYNC||!FAM_REF)return;try{var pr=FAM_REF.set(sanitiseForFirebase({profiles:data.profiles,updatedAt:Date.now()}));if(pr&&pr.then)pr.then(function(){setSync("ok","");}).catch(function(err){setSync("error",(err&&err.code)?err.code:(err&&err.message)?err.message:"write blocked");});}catch(e){setSync("error",e&&e.message?e.message:"write failed");}}
 function syncPull(){if(!FAM_REF){PULL_QUEUED=true;return;}PULL_QUEUED=false;SYNCING=true;if(S.view==="home"||S.view==="progress")render();try{FAM_REF.once("value").then(function(snap){SYNCING=false;var r=snap.val();setSync("ok","");if(!r){if(S.view==="home"||S.view==="progress")render();return;}var before=JSON.stringify(data.profiles);data=mergeData(data,r);saveLocal();if(localBeatsRemote(r))pushCloud();var after=JSON.stringify(data.profiles);if(after!==before&&S.view!=="session"&&S.view!=="welcome")render();else if(S.view==="settings"||S.view==="home"||S.view==="progress")render();}).catch(function(e){SYNCING=false;setSync("error",(e&&e.code)?e.code:(e&&e.message)?e.message:"read blocked");if(S.view==="home"||S.view==="progress")render();});}catch(e){SYNCING=false;}}
 function initSync(){try{if(typeof firebase==="undefined"){setSync("off","Cloud library did not load");return;}if(!FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey).indexOf("PASTE")>=0){setSync("off","No cloud set up");return;}firebase.initializeApp(FIREBASE_CONFIG);DB=firebase.database();FAM_REF=DB.ref("families/"+FAMILY_CODE);SYNC=true;setSync("connecting","");syncPull();
  try{DB.ref(".info/connected").on("value",function(s){if(s.val()===true){if(SYNC_STATUS.state==="connecting")setSync("ok","");}else if(SYNC_STATUS.state==="ok"){setSync("connecting","");}});}catch(e){}
@@ -323,7 +324,7 @@ function startSession(isBonus){var c=ctx();var salt=isBonus?"bonus-"+Date.now():
 function finish(){if(S.timer){clearInterval(S.timer);S.timer=null;}if("speechSynthesis"in window)window.speechSynthesis.cancel();var c=ctx();var res=S.questions.map(function(q){var g=S.answers[q.id]||"";return Object.assign({},q,{given:g,ok:isRight(q,g)});});var mainRes=res.filter(function(r){return!r.challenger;}),chRes=res.filter(function(r){return r.challenger;});var score=mainRes.filter(function(r){return r.ok;}).length,total=mainRes.length;var chScore=chRes.filter(function(r){return r.ok;}).length,chTotal=chRes.length;var dur=Math.floor((Date.now()-S.startedAt)/1000);var earned,daily=0;if(S.bonus)earned=res.filter(function(r){return r.ok;}).length*10;else{daily=50;earned=score*10+chScore*25+daily;}var points=c.p.points||0;var newPoints=points+earned;var newly=UNLOCKS.filter(function(u){return u.cost>points&&u.cost<=newPoints;});c.p.points=newPoints;
 var rec=c.p.days[c.today];
 if(!S.bonus){if(!rec){rec={score:score,total:total,chScore:chScore,chTotal:chTotal,durationSec:dur,topics:{},answers:res.map(function(r){return r.given;}),pointsEarned:earned,finishedAt:new Date().toISOString()};}else{rec.score=score;rec.total=total;rec.chScore=chScore;rec.chTotal=chTotal;rec.durationSec=dur;rec.answers=res.map(function(r){return r.given;});rec.pointsEarned=(rec.pointsEarned||0)+earned;rec.finishedAt=new Date().toISOString();}}else{if(!rec){rec={score:0,total:0,chScore:0,chTotal:0,durationSec:0,topics:{},answers:[],pointsEarned:0,bonusOnly:true,finishedAt:new Date().toISOString()};}rec.pointsEarned=(rec.pointsEarned||0)+earned;rec.extraQuestions=(rec.extraQuestions||0)+res.length;}
-if(!S.bonus){rec.qs=S.questions.map(function(q){return{prompt:q.prompt,answer:q.answer,type:q.type,choices:q.choices,topic:q.topic,label:q.label,challenger:!!q.challenger,emoji:!!q.emoji,instr:q.instr||"",say:q.say||""};});}
+if(!S.bonus){rec.qs=S.questions.map(function(q){return{prompt:q.prompt,answer:q.answer,type:q.type,choices:q.choices!=null?q.choices:null,topic:q.topic,label:q.label,challenger:!!q.challenger,emoji:!!q.emoji,instr:q.instr||"",say:q.say||""};});}
 if(!rec.topics)rec.topics={};
 res.forEach(function(r){if(!rec.topics[r.topic])rec.topics[r.topic]={c:0,t:0};rec.topics[r.topic].t++;if(r.ok)rec.topics[r.topic].c++;});
 c.p.days[c.today]=rec;
@@ -346,12 +347,13 @@ function deleteProfile(id){if(Object.keys(data.profiles).length<=1)return;if(!co
 function resetActive(){var p=P();if(!confirm("Clear "+p.name+"'s progress, points and hero? This cannot be undone."))return;p.points=0;p.boost=0;p.days={};p.heroes=[Object.assign({},DEFAULT_HERO)];p.heroIndex=0;save();S.view="home";render();}
 
 /* ===================== VIEWS ===================== */
-function topBar(){var c=ctx();return'<div class="cm-topbar"><div class="cm-logo"><span class="cm-dot">✦</span> Maths Minutes</div><div style="display:flex;gap:6px">'+
- '<span class="cm-pill">🔥 '+calcStreak(c.p.days)+'</span><span class="cm-pill">⭐ '+(c.p.points||0)+'</span>'+
- '<button class="cm-iconbtn'+(S.view==="hero"?" on":"")+'" data-act="nav" data-view="'+(S.view==="hero"?"home":"hero")+'">🦸</button>'+
-  '<button class="cm-iconbtn'+(S.view==="collection"?" on":"")+'" data-act="nav" data-view="'+(S.view==="collection"?"home":"collection")+'">🏅</button>'+
- '<button class="cm-iconbtn'+(S.view==="progress"?" on":"")+'" data-act="nav" data-view="'+(S.view==="progress"?"home":"progress")+'">📊</button>'+
- '<button class="cm-iconbtn'+(S.view==="settings"?" on":"")+'" data-act="nav" data-view="'+(S.view==="settings"?"home":"settings")+'">⚙️</button></div></div>';}
+function topBar(){var c=ctx();return'<div class="cm-topbar"><div class="cm-topbar-row"><div class="cm-logo"><span class="cm-dot">✦</span> Maths Minutes</div><div style="display:flex;gap:4px">'+' <button class="cm-iconbtn'+(S.view==="hero"?" on":"")+"\" data-act=\"nav\" data-view=\""+(S.view==="hero"?"home":"hero")+"\">🦸</button>"+
+  '<button class="cm-iconbtn'+(S.view==="collection"?" on":"")+"\" data-act=\"nav\" data-view=\""+(S.view==="collection"?"home":"collection")+"\">🏅</button>"+
+  '<button class="cm-iconbtn'+(S.view==="progress"?" on":"")+"\" data-act=\"nav\" data-view=\""+(S.view==="progress"?"home":"progress")+"\">📊</button>"+
+  '<button class="cm-iconbtn'+(S.view==="settings"?" on":"")+"\" data-act=\"nav\" data-view=\""+(S.view==="settings"?"home":"settings")+"\">⚙️</button>"+
+  '</div></div>'
+  +'<div class="cm-topbar-pills"><span class="cm-pill sm">🔥 '+calcStreak(c.p.days)+'</span><span class="cm-pill sm">⭐ '+(c.p.points||0)+'</span></div>'
+  +'</div>';}
 function profileBar(){var html='<div class="cm-profiles">';for(var id in data.profiles){var pr=data.profiles[id];html+='<button class="cm-prof'+(id===data.activeId?" on":"")+'" data-act="switch" data-id="'+id+'"><span class="cm-profav">'+heroSVG(activeHeroOf(pr),30)+'</span>'+esc(pr.name)+'</button>';}html+='<button class="cm-prof" data-act="nav" data-view="settings">➕ Add</button></div>';return html;}
 function welcomeView(){var hero=P()?activeHeroOf(P()):DEFAULT_HERO;
  return '<div class="cm-welcome">'+
