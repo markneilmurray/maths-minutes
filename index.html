@@ -293,9 +293,8 @@ var COIN_SPECS={
  100:{short:"\u00A31",rel:0.74,desc:"the twelve-sided gold-and-silver coin"},
  200:{short:"\u00A32",rel:0.90,desc:"the biggest coin, gold round the outside with a silver middle"}
 };
-/* Only coins we have real photographs for can be used in questions.
-   Add 1 and 2 here once photos of the copper coins exist. */
-var COIN_IMAGES=[5,10,20,50,100,200];
+/* Coins we have images for and can therefore ask questions about. */
+var COIN_IMAGES=[1,2,5,10,20,50,100,200];
 function coinIMG(value,box,useRel){var s=COIN_SPECS[value];if(!s)return"";var w=Math.round((box||100)*(useRel?s.rel:1));return'<img src="coins/coin-'+value+'.png" alt="'+s.short+'" width="'+w+'" height="'+w+'" style="display:inline-block;vertical-align:middle;margin:2px">';}
 /* One coin alone has nothing to compare against, so show it big; with several,
    scale by real relative size since that is itself a clue to which is which. */
