@@ -273,8 +273,8 @@ function makeQuestion(topic,rng,c){
   case"trueFalse":{var max=c.twoDigit?30:20;var a=ri(rng,2,max-2),b=ri(rng,1,max-a);var real=a+b;var wrong=rng()<0.5;var off=pick(rng,[1,2,-1,-2].filter(function(d){return real+d>0;}));var shown=wrong?real+off:real;return choiceq(shown===real?"Yes":"No","Is "+a+" + "+b+" = "+shown+"?",topic,["Yes","No"],{why:a+" + "+b+" = "+real});}
   case"compareSums":{var max=c.twoDigit?12:9;var x,y,p,q,va,vb,g=0;do{x=ri(rng,1,max);y=ri(rng,1,max);p=ri(rng,1,max);q=ri(rng,1,max);va=x+y;vb=p+q;g++;}while(va===vb&&g<30);var eA=x+"+"+y,eB=p+"+"+q;return choiceq(va>=vb?eA:eB,"Which is more?",topic,[eA,eB],{why:eA+" = "+va+", "+eB+" = "+vb});}
   case"word":{var nm=pick(rng,NAMES),nm2=pick(rng,NAMES.filter(function(x){return x!==nm;}));if(c.tables&&c.tables.length&&rng()<0.3){var g=ri(rng,2,5),p=pick(rng,c.tables);return numq(g*p,"There are "+g+" bags with "+p+" sweets in each. How many sweets altogether?","word",{why:g+" × "+p+" = "+(g*p)});}var max=c.twoDigit?40:c.addSubMax;if(rng()<0.4){var a=ri(rng,8,max),b=ri(rng,1,6),d=ri(rng,1,5);return numq(a-b+d,nm+" has "+a+" sweets, gives away "+b+", then gets "+d+" more. How many now?","word",{why:a+" − "+b+" = "+(a-b)+", then + "+d+" = "+(a-b+d)});}if(rng()<0.5){var a=ri(rng,3,max-3),b=ri(rng,1,Math.min(15,max-a));return numq(a+b,nm+" has "+a+" stickers. "+nm2+" gives them "+b+" more. How many now?","word",{why:a+" + "+b+" = "+(a+b)});}var a=ri(rng,5,max),b=ri(rng,1,a-1);return numq(a-b,"There are "+a+" cakes. "+b+" get eaten. How many are left?","word",{why:a+" − "+b+" = "+(a-b)});}
-  case"coins":{var vals=c.money==="big"?[1,2,5,10,20,50,100,200]:[1,2,5,10,20,50];var v=pick(rng,vals);var others=shuffle(rng,vals.filter(function(x){return x!==v;})).slice(0,3);var opts=shuffle(rng,[v].concat(others)).map(function(x){return COIN_SPECS[x].short;});return choiceq(COIN_SPECS[v].short,"Which coin is this?",topic,opts,{coinValues:[v],instr:"Name the coin",say:"Which coin is this?",why:"It says "+COIN_SPECS[v].words.toLowerCase()+", so it's "+COIN_SPECS[v].short});}
-  case"coinTotal":{var pool=[1,2,5,10,20,50];var n=ri(rng,2,3);var vals=[];for(var i=0;i<n;i++)vals.push(pick(rng,pool));var sum=vals.reduce(function(a,b){return a+b;},0);var run=vals[0],steps=[];for(var i=1;i<vals.length;i++){steps.push(run+"p + "+vals[i]+"p = "+(run+vals[i])+"p");run+=vals[i];}return numq(sum,"How much altogether? (in pence)",topic,{coinValues:vals,instr:"Add up the coins",say:"How much money altogether?",why:steps.join(", ")});}
+  case"coins":{var vals=c.money==="big"?COIN_IMAGES:COIN_IMAGES.filter(function(x){return x<100;});var v=pick(rng,vals);var others=shuffle(rng,vals.filter(function(x){return x!==v;})).slice(0,3);var opts=shuffle(rng,[v].concat(others)).map(function(x){return COIN_SPECS[x].short;});return choiceq(COIN_SPECS[v].short,"Which coin is this?",topic,opts,{coinValues:[v],instr:"Name the coin",say:"Which coin is this?",why:COIN_SPECS[v].short+" is "+COIN_SPECS[v].desc});}
+  case"coinTotal":{var pool=COIN_IMAGES.filter(function(x){return x<100;});var n=ri(rng,2,3);var vals=[];for(var i=0;i<n;i++)vals.push(pick(rng,pool));var sum=vals.reduce(function(a,b){return a+b;},0);var run=vals[0],steps=[];for(var i=1;i<vals.length;i++){steps.push(run+"p + "+vals[i]+"p = "+(run+vals[i])+"p");run+=vals[i];}return numq(sum,"How much altogether? (in pence)",topic,{coinValues:vals,instr:"Add up the coins",say:"How much money altogether?",why:steps.join(", ")});}
   default:return numq(0,"0 + 0 =","addition");
  }
 }
@@ -284,26 +284,22 @@ function buildQuestions(dateStr,phase,salt,count){salt=salt||"";count=count||10;
 
 /* ===================== UK COINS ===================== */
 var COIN_SPECS={
- 1:{words:"ONE PENNY",short:"1p",fill:"#c47b3f",edge:"#965c2c",text:"#543014",shape:"round",rel:0.62},
- 2:{words:"TWO PENCE",short:"2p",fill:"#c47b3f",edge:"#965c2c",text:"#543014",shape:"round",rel:0.80},
- 5:{words:"FIVE PENCE",short:"5p",fill:"#ccd1d7",edge:"#98a0a8",text:"#3f444a",shape:"round",rel:0.55},
- 10:{words:"TEN PENCE",short:"10p",fill:"#ccd1d7",edge:"#98a0a8",text:"#3f444a",shape:"round",rel:0.72},
- 20:{words:"TWENTY PENCE",short:"20p",fill:"#ccd1d7",edge:"#98a0a8",text:"#3f444a",shape:"hept",rel:0.66},
- 50:{words:"FIFTY PENCE",short:"50p",fill:"#ccd1d7",edge:"#98a0a8",text:"#3f444a",shape:"hept",rel:0.84},
- 100:{words:"ONE POUND",short:"£1",fill:"#e2b949",edge:"#a5822a",text:"#5a4210",shape:"dodec",rel:0.72},
- 200:{words:"TWO POUNDS",short:"£2",fill:"#e2b949",edge:"#a5822a",text:"#3f444a",shape:"bi",rel:0.90}
+ 1:{short:"1p",rel:0.62,desc:"the small copper coin"},
+ 2:{short:"2p",rel:0.80,desc:"the big copper coin"},
+ 5:{short:"5p",rel:0.55,desc:"the smallest silver coin"},
+ 10:{short:"10p",rel:0.72,desc:"the medium round silver coin"},
+ 20:{short:"20p",rel:0.66,desc:"the small seven-sided silver coin"},
+ 50:{short:"50p",rel:0.84,desc:"the big seven-sided silver coin"},
+ 100:{short:"\u00A31",rel:0.74,desc:"the twelve-sided gold-and-silver coin"},
+ 200:{short:"\u00A32",rel:0.90,desc:"the biggest coin, gold round the outside with a silver middle"}
 };
-function coinPoly(cx,cy,r,sides){var pts=[];for(var i=0;i<sides;i++){var a=(Math.PI*2/sides)*i-Math.PI/2;pts.push((cx+r*Math.cos(a)).toFixed(1)+","+(cy+r*Math.sin(a)).toFixed(1));}return pts.join(" ");}
-function coinSVG(value,box){box=box||100;var s=COIN_SPECS[value];if(!s)return"";var cx=box/2,cy=box/2,r=(box/2-3)*s.rel/0.90;
- var body;
- if(s.shape==="hept")body='<polygon points="'+coinPoly(cx,cy,r,7)+'" fill="'+s.fill+'" stroke="'+s.edge+'" stroke-width="2.5" stroke-linejoin="round"/>';
- else if(s.shape==="dodec")body='<polygon points="'+coinPoly(cx,cy,r,12)+'" fill="'+s.fill+'" stroke="'+s.edge+'" stroke-width="2.5" stroke-linejoin="round"/>';
- else if(s.shape==="bi")body='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+s.fill+'" stroke="'+s.edge+'" stroke-width="2.5"/><circle cx="'+cx+'" cy="'+cy+'" r="'+(r*0.70).toFixed(1)+'" fill="#ccd1d7" stroke="#98a0a8" stroke-width="1.5"/>';
- else body='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+s.fill+'" stroke="'+s.edge+'" stroke-width="2.5"/>';
- var w=s.words.split(" "),fs=Math.max(7,r*(s.shape==="bi"?0.24:0.30));
- var text='<text x="'+cx+'" y="'+(cy-fs*0.12).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-weight="800" text-anchor="middle" fill="'+s.text+'" font-family="Baloo 2,sans-serif">'+w[0]+'</text><text x="'+cx+'" y="'+(cy+fs*1.05).toFixed(1)+'" font-size="'+fs.toFixed(1)+'" font-weight="800" text-anchor="middle" fill="'+s.text+'" font-family="Baloo 2,sans-serif">'+(w[1]||"")+'</text>';
- return'<svg viewBox="0 0 '+box+' '+box+'" width="'+box+'" height="'+box+'" style="display:inline-block;vertical-align:middle;margin:2px">'+body+text+'</svg>';}
-function coinsRowHTML(values,box){return'<div style="text-align:center;margin:6px 0;line-height:0">'+values.map(function(v){return coinSVG(v,box);}).join("")+'</div>';}
+/* Only coins we have real photographs for can be used in questions.
+   Add 1 and 2 here once photos of the copper coins exist. */
+var COIN_IMAGES=[5,10,20,50,100,200];
+function coinIMG(value,box,useRel){var s=COIN_SPECS[value];if(!s)return"";var w=Math.round((box||100)*(useRel?s.rel:1));return'<img src="coins/coin-'+value+'.png" alt="'+s.short+'" width="'+w+'" height="'+w+'" style="display:inline-block;vertical-align:middle;margin:2px">';}
+/* One coin alone has nothing to compare against, so show it big; with several,
+   scale by real relative size since that is itself a clue to which is which. */
+function coinsRowHTML(values,box){var multi=values.length>1;return'<div style="text-align:center;margin:6px 0;line-height:0">'+values.map(function(v){return coinIMG(v,box,multi);}).join("")+'</div>';}
 
 /* ===================== CLOCK / TIME QUESTIONS ===================== */
 function clockSVG(hour,minute,size){size=size||170;var cx=size/2,cy=size/2,r=size/2-8;var minAngle=minute*6,hourAngle=(hour%12)*30+minute*0.5;
@@ -469,7 +465,7 @@ function sessionView(){var c=ctx();var q=S.questions[S.idx];var given=S.answers[
  html+='<div class="cm-dots">'+S.questions.map(function(qq,i){var answered=(S.answers[S.questions[i].id]||"")!=="";var cls=qq.challenger?(i===S.idx||answered?"chon":"ch"):qq.timeQ?(i===S.idx||answered?"tmon":"tm"):(i===S.idx?"now":answered?"on":"");return'<span class="cm-d '+cls+'"></span>';}).join("")+'</div>';
  if(q.instr)html+='<div class="cm-instr">'+esc(q.instr)+'</div>';
  if(isTime)html+=clockSVG(q.clockHour,q.clockMinute,170);
- else if(q.coinValues&&q.coinValues.length)html+=coinsRowHTML(q.coinValues,q.coinValues.length>2?96:118);
+ else if(q.coinValues&&q.coinValues.length)html+=coinsRowHTML(q.coinValues,q.coinValues.length===1?165:150);
  html+='<div class="cm-q '+(q.topic==="word"?"word":q.emoji?"emoji":"")+'">'+esc(q.prompt)+'</div><div style="text-align:center"><button class="cm-spk" data-act="speak">🔊 Read it to me</button></div>';
  if(q.type==="number"){html+='<div class="cm-ans" style="margin-top:12px">'+(given?esc(given):'<span style="color:#cdbfa6">?</span>')+'</div><div class="cm-pad">';["1","2","3","4","5","6","7","8","9"].forEach(function(k){html+='<button class="cm-key" data-act="key" data-k="'+k+'">'+k+'</button>';});html+='<button class="cm-key" style="color:var(--bad)" data-act="clear">C</button><button class="cm-key" data-act="key" data-k="0">0</button><button class="cm-key" data-act="del">⌫</button></div>';}
  else{var cols=q.topic==="compareMoreFewer"?1:q.choices.length===3?3:2;html+='<div class="cm-choices" style="grid-template-columns:repeat('+cols+',1fr)">';q.choices.forEach(function(ch){html+='<button class="cm-choice '+(q.emoji?"emoji":"")+(given===ch?" sel":"")+'" data-act="choice" data-v="'+esc(ch)+'">'+esc(ch)+'</button>';});html+='</div>';}
@@ -493,7 +489,7 @@ function resultsView(){var c=ctx();var R=S.results;var pct=R.total?Math.round(R.
  if(!R.review){var mainOnlyScore=R.score-(R.chScore||0)-(R.timeScore||0);html+='<div class="cm-ptcard" style="text-align:center"><div style="font-family:\'Baloo 2\';font-weight:800;font-size:20px">+'+R.earned+' points! ⭐</div><div class="cm-sub" style="font-weight:700;font-size:13px">'+mainOnlyScore+' right ×10'+(R.chScore?(" · "+R.chScore+" challenger ×25"):"")+(R.timeScore?(" · "+R.timeScore+" time ×15"):"")+(R.daily?" · daily bonus 50":"")+'</div><div class="cm-sub" style="font-weight:800;font-size:13px;margin-top:4px">Total: '+R.newPoints+' points</div></div>';}
  if(R.newly&&R.newly.length>0)html+='<div class="cm-unlock"><div class="cm-confetti">🎁</div><div style="font-family:\'Baloo 2\';font-weight:800;color:var(--purple);font-size:18px">New hero parts unlocked!</div><div style="font-weight:800;margin:4px 0 10px">'+esc(R.newly.map(function(u){return u.label;}).join(", "))+'</div><button class="cm-btn purple sm" style="width:100%" data-act="nav" data-view="hero">Go build it 🦸</button></div>';
  html+='<div style="margin-top:16px">';
- R.res.forEach(function(r){var cls=r.challenger?(r.ok?"r":"cx"):(r.ok?"r":"w");var mk=r.ok?"var(--good)":(r.challenger?"var(--purple)":"var(--bad)");html+='<div class="cm-row '+cls+'"><span class="cm-mark" style="background:'+mk+'">'+(r.ok?"✓":"✗")+'</span><div style="flex:1"><div style="font-weight:800">'+(r.challenger?"🚀 ":r.timeQ?"⏰ ":"")+esc(r.prompt)+'</div>'+(r.coinValues&&r.coinValues.length?coinsRowHTML(r.coinValues,54):(r.timeQ&&r.clockHour!=null?clockSVG(r.clockHour,r.clockMinute,70):""))+'<div style="font-size:13px;color:var(--muted);font-weight:700">'+esc(c.p.name)+': <b style="color:'+(r.ok?"var(--good)":"var(--bad)")+'">'+(r.given?esc(r.given):"—")+'</b>'+(!r.ok?(' · Answer: <b style="color:var(--ink)">'+esc(r.answer)+'</b>'):"")+'</div>'+(!r.ok&&r.why?('<div style="font-size:12.5px;color:var(--primary-d);font-weight:700;margin-top:3px">💡 '+esc(r.why)+'</div>'):"")+'</div></div>';});
+ R.res.forEach(function(r){var cls=r.challenger?(r.ok?"r":"cx"):(r.ok?"r":"w");var mk=r.ok?"var(--good)":(r.challenger?"var(--purple)":"var(--bad)");html+='<div class="cm-row '+cls+'"><span class="cm-mark" style="background:'+mk+'">'+(r.ok?"✓":"✗")+'</span><div style="flex:1"><div style="font-weight:800">'+(r.challenger?"🚀 ":r.timeQ?"⏰ ":"")+esc(r.prompt)+'</div>'+(r.coinValues&&r.coinValues.length?coinsRowHTML(r.coinValues,r.coinValues.length===1?54:62):(r.timeQ&&r.clockHour!=null?clockSVG(r.clockHour,r.clockMinute,70):""))+'<div style="font-size:13px;color:var(--muted);font-weight:700">'+esc(c.p.name)+': <b style="color:'+(r.ok?"var(--good)":"var(--bad)")+'">'+(r.given?esc(r.given):"—")+'</b>'+(!r.ok?(' · Answer: <b style="color:var(--ink)">'+esc(r.answer)+'</b>'):"")+'</div>'+(!r.ok&&r.why?('<div style="font-size:12.5px;color:var(--primary-d);font-weight:700;margin-top:3px">💡 '+esc(r.why)+'</div>'):"")+'</div></div>';});
  html+='</div><div class="cm-nav" style="margin-top:14px"><button class="cm-btn ghost" data-act="nav" data-view="home">🏠 Home</button><button class="cm-btn amber" data-act="start" data-bonus="1">➕ More questions</button></div></div>';
  return html;}
 function swatchBg(cat,id){var grad={rainbow:"linear-gradient(45deg,#ff4d4d,#ffd23f,#33c777,#3b8dff)",galaxy:"linear-gradient(45deg,#1e3a8a,#7b3fc9,#ec5fa6)",fire:"linear-gradient(45deg,#facc15,#f08a24,#dc2626)",flame:"linear-gradient(45deg,#facc15,#f08a24,#dc2626)",ocean:"linear-gradient(45deg,#3b8dff,#14b8a6)",sunset:"linear-gradient(45deg,#f08a24,#ec5fa6,#7b3fc9)"};if(grad[id])return grad[id];if(cat==="suit")return SUIT[id]||"#ccc";return CAPECOL[id]||"#ccc";}
