@@ -157,7 +157,7 @@ function defaultMulti(){return{activeId:"charlie",profiles:{
 }};}
 function fixHero(h){return Object.assign({},DEFAULT_HERO,h||{});}
 function sanitiseDays(days){var out={};for(var k in days){var d=days[k];if(d&&d.topics){var clean={};for(var t in d.topics){var v=d.topics[t];if(v&&v.c>=0&&v.t>=0&&v.c<=2000&&v.t<=2000)clean[t]=v;}d=Object.assign({},d,{topics:clean});}out[k]=d;}return out;}
-function fixProfile(p,id){var heroes;if(Array.isArray(p.heroes)&&p.heroes.length)heroes=p.heroes.map(fixHero);else if(p.hero)heroes=[fixHero(p.hero)];else heroes=[Object.assign({},DEFAULT_HERO)];var heroIndex=Math.min(p.heroIndex||0,heroes.length-1);if(heroIndex<0)heroIndex=0;return{id:p.id||id,name:p.name||"Child",cohort:(p.cohort==null?2024:p.cohort),level:p.level||"auto",depth:p.depth||"expected",points:p.points||0,boost:p.boost||0,heroes:heroes,heroIndex:heroIndex,days:sanitiseDays(p.days||{}),updatedAt:p.updatedAt||0};}
+function fixProfile(p,id){var heroes;if(Array.isArray(p.heroes)&&p.heroes.length)heroes=p.heroes.map(fixHero);else if(p.hero)heroes=[fixHero(p.hero)];else heroes=[Object.assign({},DEFAULT_HERO)];var heroIndex=Math.min(p.heroIndex||0,heroes.length-1);if(heroIndex<0)heroIndex=0;return{id:p.id||id,name:p.name||"Child",cohort:(p.cohort==null?2024:p.cohort),level:p.level||"auto",depth:p.depth||"expected",ahead:!!p.ahead,points:p.points||0,boost:p.boost||0,heroes:heroes,heroIndex:heroIndex,days:sanitiseDays(p.days||{}),updatedAt:p.updatedAt||0};}
 function activeHeroOf(pr){if(!pr||!pr.heroes||!pr.heroes.length){if(pr&&pr.hero)return fixHero(pr.hero);return Object.assign({},DEFAULT_HERO);}return pr.heroes[Math.min(pr.heroIndex||0,pr.heroes.length-1)]||pr.heroes[0];}
 function mergeMulti(d){if(!d||!d.profiles||!Object.keys(d.profiles).length)return defaultMulti();var profiles={};for(var id in d.profiles)profiles[id]=fixProfile(d.profiles[id],id);var activeId=(d.activeId&&profiles[d.activeId])?d.activeId:Object.keys(profiles)[0];return{activeId:activeId,profiles:profiles};}
 function load(){try{var r=localStorage.getItem(LS);return r?mergeMulti(JSON.parse(r)):defaultMulti();}catch(e){return defaultMulti();}}
@@ -209,7 +209,7 @@ function schoolStartYear(ds){var p=ds.split("-").map(Number);return p[1]>=9?p[0]
 function cohortFromStage(stage,ds){var sy=schoolStartYear(ds);return({preschool:sy+1,reception:sy,year1:sy-1,year2:sy-2}[stage])!=null?{preschool:sy+1,reception:sy,year1:sy-1,year2:sy-2}[stage]:sy;}
 function stageInfo(cohort,ds){var p=ds.split("-").map(Number);var sy=schoolStartYear(ds);var lvl=sy-cohort;var term=p[1]>=9?"a":(p[1]<=4?"b":"c");return{lvl:lvl,term:term};}
 function phaseKeyFor(lvl,term){if(lvl<=-1)return"preschool";if(lvl===0)return term==="a"?"receptionA":"receptionB";if(lvl===1)return term==="a"?"y1a":term==="b"?"y1b":"y1c";if(lvl===2)return term==="a"?"y2a":term==="b"?"y2b":"y2c";return"y3taster";}
-function resolvePhaseKey(p,ds){var si=stageInfo(p.cohort,ds);if(p.level==="auto")return phaseKeyFor(si.lvl,si.term);var map={preschool:-1,reception:0,year1:1,year2:2};return phaseKeyFor(map[p.level]!=null?map[p.level]:si.lvl,si.term);}
+function resolvePhaseKey(p,ds){var si=stageInfo(p.cohort,ds);var key;if(p.level==="auto")key=phaseKeyFor(si.lvl,si.term);else{var map={preschool:-1,reception:0,year1:1,year2:2};key=phaseKeyFor(map[p.level]!=null?map[p.level]:si.lvl,si.term);}return p.ahead?NEXT[key]:key;}
 
 /* ===================== CURRICULUM ===================== */
 var LABELS={addition:"Adding",subtraction:"Taking away",numberBond:"Number bonds",missingNumber:"Missing numbers",counting:"Counting in steps",oneMoreLess:"More & less",placeValue:"Tens & ones",doubling:"Doubling & halving",fractionNum:"Fractions",word:"Word problems",money:"Money",compare:"Comparing",oddEven:"Odd & even",tables:"Times tables",division:"Sharing & dividing",balance:"Balancing sums",threeAdd:"Adding three",trueFalse:"True or false",compareSums:"Which is more",countObjects:"Counting",subitise:"Spotting numbers",addObjects:"Adding things",oneMoreLessSmall:"One more & less",compareMoreFewer:"More or fewer",shapes:"Shapes",patterns:"Patterns",bondsToTen:"Bonds to 10",doublingSmall:"Doubling",halvingSmall:"Halving",time:"Telling the time",coins:"UK coins",coinTotal:"Counting money"};
@@ -544,6 +544,9 @@ function settingsView(){var c=ctx();var p=c.p;var stageBtns=[["preschool","Presc
  html+='<div style="font-weight:800;font-size:14px;margin-bottom:6px">Year level</div><div class="cm-sub" style="font-weight:700;font-size:13px;margin-bottom:8px">Auto follows the school year (now '+PHASES[c.baseKey].label+').</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">';
  [["auto","Auto"],["preschool","Preschool"],["reception","Reception"],["year1","Year 1"],["year2","Year 2"]].forEach(function(o){html+='<button class="cm-btn sm '+(p.level===o[0]?"":"ghost")+'" style="width:100%" data-act="level" data-v="'+o[0]+'">'+o[1]+'</button>';});
  html+='</div>';
+ html+='<div style="font-weight:800;font-size:14px;margin:14px 0 6px">Working ahead</div><div class="cm-sub" style="font-weight:700;font-size:13px;margin-bottom:8px">Moves '+esc(p.name)+' up to the next term\'s work early. Now: '+PHASES[resolvePhaseKey(p,c.today)].label+'.</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';
+ [[false,"Normal"],[true,"A term ahead"]].forEach(function(o){html+='<button class="cm-btn sm '+((!!p.ahead)===o[0]?"":"ghost")+'" style="width:100%" data-act="ahead" data-v="'+(o[0]?"1":"0")+'">'+o[1]+'</button>';});
+ html+='</div>';
  if(!c.phase.early){html+='<div style="font-weight:800;font-size:14px;margin:14px 0 6px">Challenge level</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';[["expected","Working at"],["greater","Greater depth"]].forEach(function(o){html+='<button class="cm-btn sm '+(p.depth===o[0]?"":"ghost")+'" style="width:100%" data-act="depth" data-v="'+o[0]+'">'+o[1]+'</button>';});html+='</div>';}
  html+='<button class="cm-btn ghost" style="color:var(--bad);border-color:#f6cdcf;margin-top:16px" data-act="reset">↺ Reset '+esc(p.name)+'\'s progress</button>';
  html+='<div class="cm-hr"></div><div style="font-weight:800;font-size:15px;margin-bottom:8px">Children</div>';
@@ -602,6 +605,7 @@ function onClick(e){var t=e.target.closest("[data-act]");if(!t)return;var a=t.ge
  else if(a==="herocat"){var k=t.getAttribute("data-cat");S.heroCat=(S.heroCat===k)?"":k;render();}
  else if(a==="level"){P().level=t.getAttribute("data-v");save();render();}
  else if(a==="depth"){P().depth=t.getAttribute("data-v");save();render();}
+ else if(a==="ahead"){P().ahead=t.getAttribute("data-v")==="1";save();render();}
  else if(a==="stage"){S.newStage=t.getAttribute("data-v");render();}
  else if(a==="add")addProfile();
  else if(a==="delchild")deleteProfile(t.getAttribute("data-id"));
